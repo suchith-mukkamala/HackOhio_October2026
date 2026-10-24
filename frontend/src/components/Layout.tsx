@@ -1,17 +1,21 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Compass, Home, Inbox, LogOut, MessageSquare, Plus, Search, Shield } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import Avatar from './Avatar'
 import { post } from '../lib/api'
+import { usePageNavigation } from '../lib/usePageNavigation'
 import { useMe } from '../lib/auth'
 
 // LinkedIn-style tab: icon over a small label, underlined when active
-const Tab = ({ to, icon: Icon, label }: { to: string; icon: LucideIcon; label: string }) => (
+const Tab = ({ to, icon: Icon, label }: { to: string; icon: LucideIcon; label: string }) => {
+  const { onLinkClick } = usePageNavigation()
+  return (
   <NavLink
     to={to}
+    onClick={event => onLinkClick(event, to)}
     className={({ isActive }) =>
-      `flex h-full w-12 flex-col sm:w-16 lg:w-20 items-center justify-center gap-0.5 border-b-2 text-[10px] sm:text-xs ${
+      `flex h-full w-12 flex-col sm:w-16 lg:w-20 items-center justify-center gap-0.5 border-b-2 transition-colors duration-150 motion-reduce:transition-none text-[10px] sm:text-xs ${
         isActive ? 'border-ink text-ink' : 'border-transparent text-muted hover:text-ink'
       }`
     }
@@ -19,12 +23,14 @@ const Tab = ({ to, icon: Icon, label }: { to: string; icon: LucideIcon; label: s
     <Icon size={22} strokeWidth={1.75} />
     {label}
   </NavLink>
-)
+  )
+}
 
 export default function Layout() {
   const { data: me } = useMe()
   const qc = useQueryClient()
-  const navigate = useNavigate()
+  const { go: navigate, onLinkClick } = usePageNavigation()
+  const location = useLocation()
   const isMentor = me?.role === 'mentor' || me?.role === 'faculty'
 
   async function signOut() {
@@ -37,7 +43,7 @@ export default function Layout() {
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-edge bg-panel">
         <div className="mx-auto flex h-14 w-full max-w-6xl min-w-0 items-center gap-2 px-3 sm:gap-3 sm:px-4">
-          <NavLink to="/feed" className="hidden h-9 w-9 shrink-0 place-items-center sm:grid rounded-lg bg-accent font-bold text-white">
+          <NavLink to="/feed" onClick={event => onLinkClick(event, '/feed')} className="hidden h-9 w-9 shrink-0 place-items-center sm:grid rounded-lg bg-accent font-bold text-white">
             K
           </NavLink>
           <form
@@ -60,8 +66,9 @@ export default function Layout() {
             {me && (
               <NavLink
                 to={`/u/${me.id}`}
+                onClick={event => onLinkClick(event, `/u/${me.id}`)}
                 className={({ isActive }) =>
-                  `flex w-12 flex-col sm:w-16 lg:w-20 items-center justify-center gap-0.5 border-b-2 text-xs ${
+                  `flex w-12 flex-col sm:w-16 lg:w-20 items-center justify-center gap-0.5 border-b-2 transition-colors duration-150 motion-reduce:transition-none text-xs ${
                     isActive ? 'border-ink text-ink' : 'border-transparent text-muted hover:text-ink'
                   }`
                 }
@@ -76,7 +83,7 @@ export default function Layout() {
         </div>
       </header>
 
-      <main className="mx-auto w-full min-w-0 max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
+      <main key={location.pathname} className="page-content mx-auto w-full min-w-0 max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
         <Outlet />
       </main>
     </div>
