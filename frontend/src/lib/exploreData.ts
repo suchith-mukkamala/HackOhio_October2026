@@ -1,9 +1,12 @@
 import { createSearchIndex } from './exploreSearch'
-import type { Role } from './types'
+import type { Project, Role, User } from './types'
+import { headline } from './auth'
 
 export type ExploreCategory = 'students' | 'projects' | 'mentors'
 export type ExploreEntry = {
   id: string
+  href: string
+  avatar_url?: string
   category: ExploreCategory
   name: string
   subtitle: string
@@ -15,25 +18,23 @@ export type ExploreEntry = {
   team?: string[]
 }
 
-// Standalone example records; these identifiers intentionally do not imply database IDs.
-export const exploreEntries: ExploreEntry[] = [
-  { id: 'maya', category: 'students', name: 'Maya Chen', subtitle: '3rd year · Computer Science & Engineering', description: 'Backend-curious, learning FastAPI by breaking it. Building live campus bus arrivals with BuckeyeBus Live.', skills: ['Python', 'SQL', 'FastAPI', 'React'], roles: ['student'], majors: ['Computer Science & Engineering'] },
-  { id: 'jordan', category: 'students', name: 'Jordan Reyes', subtitle: '2nd year · Mechanical Engineering', description: 'Builds robots and wants to learn the software side. Working on a web-controlled rover arm.', skills: ['CAD', 'Arduino', 'C++'], roles: ['student'], majors: ['Mechanical Engineering'] },
-  { id: 'priya', category: 'students', name: 'Priya Natarajan', subtitle: '4th year · Design', description: 'UX researcher who prototypes in Figma. Making campus transit easier to navigate, one usability session at a time.', skills: ['UI Design', 'UX Research', 'Figma'], roles: ['student'], majors: ['Design'] },
-  { id: 'sam', category: 'mentors', name: 'Sam Okafor', subtitle: 'Software Engineer · Honda R&D', description: 'Happy to give 15 minutes on backend and cloud. Bring a question, a code snippet, or something you are stuck on.', skills: ['Python', 'FastAPI', 'AWS', 'Docker', 'System Design'], roles: ['mentor'], majors: [] },
-  { id: 'elena', category: 'mentors', name: 'Elena Park', subtitle: 'Data Scientist · 99P Labs', description: 'ML, data pipelines, and making charts honest. Here to help turn your measurements into useful insights.', skills: ['Machine Learning', 'Data Analysis', 'Python', 'SQL'], roles: ['mentor'], majors: [] },
-  { id: 'marcus', category: 'mentors', name: 'Dr. Marcus Lee', subtitle: 'Senior Lecturer · Ohio State CSE', description: 'Advises capstone teams. Happy to discuss project scope, testing, and how to show the work behind your progress.', skills: ['System Design', 'Testing', 'Project Management'], roles: ['faculty'], majors: [] },
-  { id: 'bus', category: 'projects', name: 'BuckeyeBus Live', subtitle: 'Campus transit · In progress', description: 'Real-time campus bus arrivals with crowding estimates. Help build a clearer picture of the next bus.', skills: ['Python', 'FastAPI', 'React', 'SQL'], roles: ['student'], majors: ['Computer Science & Engineering', 'Design'], lookingFor: ['Frontend dev', 'Data person'], team: ['Maya Chen', 'Priya Natarajan'] },
-  { id: 'rover', category: 'projects', name: 'Mars Rover Arm', subtitle: 'Robotics · In progress', description: 'A 4-DOF arm for the rover club, controlled from a web dashboard. Help connect the hardware to the interface.', skills: ['Arduino', 'C++', 'CAD', 'React'], roles: ['student'], majors: ['Mechanical Engineering'], lookingFor: ['Embedded dev'], team: ['Jordan Reyes'] },
-]
-
-export const exploreById = new Map(exploreEntries.map(entry => [entry.id, entry]))
-export const exploreIndex = createSearchIndex(exploreEntries.map(entry => ({
+export function userEntry(user: User): ExploreEntry {
+  return { id: 'user-' + user.id, href: '/u/' + user.id, avatar_url: user.avatar_url,
+    category: user.role === 'student' ? 'students' : 'mentors', name: user.name,
+    subtitle: headline(user), description: user.bio ?? '', skills: user.expertise_tags,
+    roles: [user.role], majors: user.major ? [user.major] : [] }
+}
+export function projectEntry(project: Project): ExploreEntry {
+  return { id: 'project-' + project.id, href: '/projects/' + project.id, category: 'projects',
+    name: project.title, subtitle: 'In progress', description: project.description,
+    skills: project.tags, roles: [], majors: [], lookingFor: project.looking_for }
+}
+export const indexEntries = (entries: ExploreEntry[]) => createSearchIndex(entries.map(entry => ({
   id: entry.id,
   fields: [
     { text: entry.name, weight: 5 },
     { text: entry.skills.join(' '), weight: 4 },
-    { text: [entry.subtitle, ...entry.majors, ...entry.roles, ...(entry.team ?? []), ...(entry.lookingFor ?? [])].join(' '), weight: 2 },
+    { text: [entry.subtitle, ...entry.majors, ...entry.roles, ...(entry.lookingFor ?? [])].join(' '), weight: 2 },
     { text: entry.description, weight: 1 },
   ],
 })))

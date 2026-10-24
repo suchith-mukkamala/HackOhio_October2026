@@ -1,88 +1,114 @@
-/** Local inverted index. Rebuild when the source data changes, not on each keystroke. */
-export type SearchDocument = { id: string; fields: { text: string; weight: number }[] }
-
-const normalize = (text: string) => text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-const tokenize = (text: string) => normalize(text).match(/[a-z0-9+#]+/g) ?? []
-
-function signatures(word: string) {
-  return new Set([word, ...Array.from(word, (_, i) => word.slice(0, i) + word.slice(i + 1))])
+export type SearchDocument = {
+  id: string
+  fields: { text: string; weight: number }[]
 }
 
-// One insertion, deletion, substitution, or adjacent transposition. Linear verification.
-function oneTypo(a: string, b: string): boolean {
+type SearchHit = {
+  id: string
+  score: number
+  fuzzy: boolean
+}
+
+type TokenMatch = {
+  score: number
+  fuzzy: boolean
+}
+
+const normalize = (text: string) =>
+  text
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+
+const tokenize = (text: string) => normalize(text).match(/[a-z0-9]+/g) ?? []
+
+function oneTypoAway(a: string, b: string): boolean {
   if (Math.abs(a.length - b.length) > 1) return false
-  let i = 0
-  while (i < Math.min(a.length, b.length) && a[i] === b[i]) i++
-  if (i === Math.min(a.length, b.length)) return true
+
+  let left = 0
+  while (left < Math.min(a.length, b.length) && a[left] === b[left]) left += 1
+  if (left === Math.min(a.length, b.length)) return true
+
   if (a.length === b.length) {
-    return a.slice(i + 1) === b.slice(i + 1) ||
-      (a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2))
+    return (
+      a.slice(left + 1) === b.slice(left + 1) ||
+      (a[left] === b[left + 1] && a[left + 1] === b[left] && a.slice(left + 2) === b.slice(left + 2))
+    )
   }
-  return a.length > b.length ? a.slice(i + 1) === b.slice(i) : a.slice(i) === b.slice(i + 1)
+
+  const [longer, shorter] = a.length > b.length ? [a, b] : [b, a]
+  return longer.slice(left + 1) === shorter.slice(left)
 }
 
-function add<K, V>(map: Map<K, Set<V>>, key: K, value: V) {
-  if (!map.has(key)) map.set(key, new Set())
-  map.get(key)!.add(value)
+function scoreToken(token: string, word: string): TokenMatch | null {
+  if (word === token) return { score: 12, fuzzy: false }
+  if (word.startsWith(token)) return { score: 8, fuzzy: false }
+  if (token.length >= 4 && word.includes(token)) return { score: 4, fuzzy: false }
+  if (token.length >= 4 && oneTypoAway(token, word)) return { score: 2, fuzzy: true }
+  return null
 }
 
 export function createSearchIndex(documents: SearchDocument[]) {
-  const postings = new Map<string, Map<string, number>>()
-  const grams = new Map<string, Set<string>>()
-  const deletions = new Map<string, Set<string>>()
-
-  for (const document of documents) {
-    for (const field of document.fields) {
-      for (const word of tokenize(field.text)) {
-        if (!postings.has(word)) postings.set(word, new Map())
-        const hits = postings.get(word)!
-        hits.set(document.id, Math.max(hits.get(document.id) ?? 0, field.weight))
-      }
-    }
-  }
-  for (const word of postings.keys()) {
-    // 1–3 character grams support prefixes AND matches inside a word.
-    for (let size = 1; size <= Math.min(3, word.length); size++) {
-      for (let i = 0; i <= word.length - size; i++) add(grams, word.slice(i, i + size), word)
-    }
-    for (const signature of signatures(word)) add(deletions, signature, word)
-  }
+  const indexed = documents.map((document) => ({
+    id: document.id,
+    fields: document.fields.map((field) => ({
+      text: normalize(field.text),
+      weight: field.weight,
+      words: tokenize(field.text),
+    })),
+  }))
 
   return {
-    search(query: string): { id: string; score: number; fuzzy: boolean }[] {
-      const tokens = [...new Set(tokenize(query))]
+    search(query: string): SearchHit[] {
+      const tokens = tokenize(query)
       if (!tokens.length) return documents.map(({ id }) => ({ id, score: 0, fuzzy: false }))
-      let matches: Map<string, { score: number; fuzzy: boolean }> | undefined
-      for (const token of tokens) {
-        const size = Math.min(3, token.length)
-        const buckets = Array.from({ length: token.length - size + 1 }, (_, i) => grams.get(token.slice(i, i + size)) ?? new Set<string>())
-        buckets.sort((a, b) => a.size - b.size)
-        const candidates = new Set([...buckets[0]].filter(word => buckets.every(bucket => bucket.has(word)) && word.includes(token)))
-        // Skip fuzzy expansion for tiny queries, where unrelated matches would overwhelm results.
-        if (token.length >= 3 && token.length <= 64) {
-          for (const signature of signatures(token)) {
-            for (const word of deletions.get(signature) ?? []) {
-              if (oneTypo(token, word)) candidates.add(word)
+
+      const normalizedQuery = tokens.join(' ')
+      const hits: SearchHit[] = []
+
+      for (const document of indexed) {
+        let score = 0
+        let fuzzy = false
+        let matchedEveryToken = true
+
+        for (const token of tokens) {
+          let best: TokenMatch | null = null
+          let bestWeight = 0
+
+          for (const field of document.fields) {
+            for (const word of field.words) {
+              const match = scoreToken(token, word)
+              if (!match) continue
+
+              const weightedScore = match.score * field.weight
+              if (!best || weightedScore > best.score * bestWeight) {
+                best = match
+                bestWeight = field.weight
+              }
             }
           }
-        }
-        const hits = new Map<string, { score: number; fuzzy: boolean }>()
-        for (const word of candidates) {
-          const quality = word === token ? 4 : word.startsWith(token) ? 3 : word.includes(token) ? 2 : 1
-          for (const [id, weight] of postings.get(word)!) {
-            const score = quality * weight
-            if (score > (hits.get(id)?.score ?? 0)) hits.set(id, { score, fuzzy: quality === 1 })
+
+          if (!best) {
+            matchedEveryToken = false
+            break
           }
+
+          score += best.score * bestWeight
+          fuzzy ||= best.fuzzy
         }
-        const previous = matches
-        matches = new Map([...hits].flatMap(([id, hit]) => {
-          if (!previous) return [[id, hit]]
-          const prior = previous.get(id)
-          return prior ? [[id, { score: hit.score + prior.score, fuzzy: hit.fuzzy || prior.fuzzy }]] : []
-        }))
-        if (!matches.size) return []
+
+        if (!matchedEveryToken) continue
+
+        for (const field of document.fields) {
+          if (field.text.includes(normalizedQuery)) score += 6 * field.weight
+        }
+
+        hits.push({ id: document.id, score, fuzzy })
       }
-      return [...matches!].map(([id, hit]) => ({ id, ...hit })).sort((a, b) => Number(a.fuzzy) - Number(b.fuzzy) || b.score - a.score || a.id.localeCompare(b.id))
+
+      return hits.sort((a, b) =>
+        b.score - a.score || Number(a.fuzzy) - Number(b.fuzzy) || a.id.localeCompare(b.id),
+      )
     },
   }
 }
