@@ -25,7 +25,7 @@ check and is not included in unittest discovery.
 tables; it does not add columns to existing tables. The migration preserves
 existing users and leaves GitHub/demo accounts without local passwords. Duplicate
 usernames or emails must be resolved before its unique indexes can be created.
-Do not run `seed.py` to migrate an existing database: it drops all tables.
+Never drop tables on the shared AWS database.
 
 Existing SQLite databases also need nullable `username` and `password_hash`
 columns and unique indexes on `username` and `email`. The PostgreSQL migration

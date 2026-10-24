@@ -84,7 +84,7 @@ We dropped the whiteboard's "an app for students to create their own apps" frami
 Browser (Vite + React)
    │  /api/*  (Vite proxy in dev, Vercel rewrite in prod)
    ▼
-FastAPI  ──► SQLite (local) / RDS Postgres (prod)
+FastAPI  ──► AWS RDS Postgres (shared)
    │
    ├──► GitHub REST API  (repos, languages, commits, README)
    └──► Claude API       (commits → structured LogDraft)
@@ -113,7 +113,7 @@ All tables live in `backend/app/models.py`. Lists are JSON columns.
 
 ### Key mechanics
 
-**Auto-docs** (`services/github.py`, `services/claude.py`)
+**Auto-docs** (`services/github.py`, `services/ai.py`)
 1. Fetch commits since the last log, with changed file names and line stats (no patch bodies).
 2. Add the README and project description.
 3. Claude returns a `LogDraft`: `title`, `built`, `learned`, `stuck`, `skills` (from a fixed vocabulary).
@@ -225,7 +225,7 @@ Tools from the whiteboard: Slides Go, Canva or Google Slides for the few title c
 - [ ] Agree on the product name (ideas: Keystone, Proof, Buckeye Build)
 - [ ] Everyone runs backend + frontend locally (see README)
 - [ ] Create the local GitHub OAuth app; share the client ID and secret privately, never in the repo
-- [ ] Share an Anthropic API key privately for `backend/.env`
+- [ ] Share an OpenAI API key privately for `backend/.env`
 - [ ] Pick the 6 real repos for seed projects
 - [ ] Pick the pitch owner
 
