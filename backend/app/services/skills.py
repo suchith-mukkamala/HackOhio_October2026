@@ -65,7 +65,7 @@ LANGUAGE_TO_SKILL = {
 
 TIER_RANK = {"claimed": 0, "code": 1, "peer": 2, "mentor": 3}
 
-TOP_N = 12  # how many evidenced skills to show; their ancestors are added on top
+
 
 
 def normalize(skill: str) -> str | None:
@@ -184,7 +184,7 @@ def skill_graph(session: Session, user: User) -> dict:
         for a, b in combinations(sorted(skills_here), 2):
             edge_weight[(a, b)] += 1
 
-    top = sorted(tier, key=lambda s: score[s], reverse=True)[:TOP_N]
+    top = sorted(tier, key=lambda s: (-score[s], s))
     shown = build_hierarchy(top, score)
     nodes = []
     for h in shown:

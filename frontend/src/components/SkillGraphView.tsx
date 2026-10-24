@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react'
 import type { CSSProperties, KeyboardEvent } from 'react'
 import type { SkillGraph, SkillNode } from '../lib/types'
 import './SkillGraphView.css'
+import { useGraphGestures } from '../lib/useGraphGestures'
+import { spaceGraph } from '../lib/skillGraphLayout'
 
 const SIZE = 800
-const PAD = 110 // extra room left and right so long labels aren't cut off
 const C = SIZE / 2
 const RING = [0, 110, 200, 280, 350] // radius by depth; depth 1 = top-level categories
 const PULSE_AT = 0.6 // nodes at or above this pulse value animate
@@ -18,6 +19,7 @@ interface Placed {
 }
 
 interface Layout {
+  bounds: { x: number; y: number; width: number; height: number }
   placed: Placed[]
   treeLinks: [string, string | null][] // [child, parent]; parent null = joins the center
 }
@@ -76,7 +78,7 @@ function layout(nodes: SkillNode[], isOpen: (skill: string) => boolean): Layout 
     place(root, cur, cur + span, 1, null)
     cur += span
   }
-  return { placed, treeLinks }
+  return { ...spaceGraph(placed, C), treeLinks }
 }
 
 interface Props {
@@ -85,20 +87,28 @@ interface Props {
 }
 
 export default function SkillGraphView({ graph, name }: Props) {
-  // Categories and derived parents start open; clicking a node flips it from its default.
+  // Start every branch expanded so no skill is hidden on first view.
   const [flipped, setFlipped] = useState<Set<string>>(new Set())
+  const { ref: gestureRef, camera } = useGraphGestures(graph.nodes.length > 0)
   const [selected, setSelected] = useState<string | null>(null)
 
   const nodeByName = useMemo(() => new Map(graph.nodes.map((n) => [n.skill, n])), [graph.nodes])
 
-  const { placed, treeLinks } = useMemo(() => {
+  const { placed, treeLinks, bounds } = useMemo(() => {
     const isOpen = (skill: string) => {
-      const tier = nodeByName.get(skill)?.tier
-      const byDefault = tier === 'category' || tier === 'derived'
-      return flipped.has(skill) ? !byDefault : byDefault
+      return !flipped.has(skill)
     }
     return layout(graph.nodes, isOpen)
-  }, [graph.nodes, nodeByName, flipped])
+  }, [graph.nodes, flipped])
+
+  // Keep the original 1020:800 display proportions while fitting every label.
+  const displayWidth = Math.max(bounds.width, bounds.height * 1020 / 800)
+  const displayHeight = displayWidth * 800 / 1020
+  const viewX = bounds.x - (displayWidth - bounds.width) / 2
+  const viewY = bounds.y - (displayHeight - bounds.height) / 2
+
+  // Counteract camera zoom around each anchor so only the spacing changes.
+  const fixedSizeAt = (x: number, y: number) => `translate(${x} ${y}) scale(${1 / camera.scale}) translate(${-x} ${-y})`
 
   const pos = new Map(placed.map((p) => [p.node.skill, p]))
   const sel = selected ? nodeByName.get(selected) : undefined
@@ -123,7 +133,9 @@ export default function SkillGraphView({ graph, name }: Props) {
   return (
     <div className="skillgraph">
       <svg
-        viewBox={`${-PAD} 0 ${SIZE + 2 * PAD} ${SIZE}`}
+        ref={gestureRef}
+        viewBox={`${viewX - camera.x * displayWidth / camera.scale} ${viewY - camera.y * displayHeight / camera.scale} ${displayWidth / camera.scale} ${displayHeight / camera.scale}`}
+        preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label={`Skill graph${name ? ` for ${name}` : ''}`}
       >
@@ -154,7 +166,7 @@ export default function SkillGraphView({ graph, name }: Props) {
           )
         })}
 
-        <g className="sg-center">
+        <g className="sg-center" transform={fixedSizeAt(C, C)}>
           <circle cx={C} cy={C} r={34} />
           <text x={C} y={C} dy="0.35em" textAnchor="middle">
             {(name ?? 'You').split(' ')[0]}
@@ -184,6 +196,7 @@ export default function SkillGraphView({ graph, name }: Props) {
           return (
             <g
               key={node.skill}
+              transform={fixedSizeAt(x, y)}
               className={cls}
               style={style}
               tabIndex={0}
