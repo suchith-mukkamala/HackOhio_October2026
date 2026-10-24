@@ -15,6 +15,11 @@ export interface User {
   expertise_tags: string[]
 }
 
+// Body of PUT /me. Only these fields can be edited; send the full expertise_tags list each time.
+export type MeUpdate = Partial<
+  Pick<User, 'bio' | 'major' | 'year' | 'company' | 'title' | 'expertise_tags'>
+>
+
 export interface Project {
   id: number
   owner_id: number
@@ -58,16 +63,29 @@ export interface HelpRequest {
   match_score?: number
 }
 
+// Strongest kind of evidence behind a skill the user actually has.
 export type SkillTier = 'claimed' | 'code' | 'peer' | 'mentor'
+
+// 'category' = top-level branch (Programming, Hardware...). 'derived' = a parent skill that
+// only appears because one of its children is strong (e.g. Python above FastAPI).
+export type NodeTier = SkillTier | 'category' | 'derived'
 
 export interface SkillNode {
   skill: string
+  parent: string | null // name of another node, or null for a top-level category
   score: number
-  tier: SkillTier
-  evidence: { kind: 'code' | 'peer' | 'mentor' | 'help_given'; label: string }[]
+  pulse: number // 0..1: strongest score at or below this node / user's strongest score
+  tier: NodeTier
+  evidence: { kind: 'claimed' | 'code' | 'peer' | 'mentor' | 'help_given'; label: string }[]
 }
 
 export interface SkillGraph {
   nodes: SkillNode[]
-  edges: { a: string; b: string; weight: number }[]
+  edges: { a: string; b: string; weight: number }[] // skills used together on a project
+}
+
+// GET /skills/vocabulary: the fixed tree, for the onboarding picker.
+export interface SkillVocabulary {
+  categories: string[]
+  skills: { skill: string; parent: string | null }[]
 }
