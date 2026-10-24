@@ -62,6 +62,8 @@ def list_projects(q: str = "", tag: str = "", status: str = "active", session: S
 
 @router.post("", response_model=Project)
 def create_project(body: ProjectIn, user: User = Depends(current_user), session: Session = Depends(get_session)):
+    if user.role != "student":
+        raise HTTPException(403, "Only students can publish projects")
     project = Project(owner_id=user.id, **body.model_dump())
     session.add(project)
     session.commit()
