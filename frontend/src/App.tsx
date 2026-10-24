@@ -13,6 +13,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
+      <Route path="/register" element={<Landing register />} />
       <Route element={<Layout />}>
         <Route path="/feed" element={<Feed />} />
         <Route path="/explore" element={<Explore />} />

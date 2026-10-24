@@ -1,20 +1,21 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Github } from 'lucide-react'
 import { ApiError, post } from '../lib/api'
 
-export default function Landing() {
+// Sign-in page; with `register` it becomes the create-account page at /register
+export default function Landing({ register = false }: { register?: boolean }) {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [error, setError] = useState('')
 
   async function signIn(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const f = new FormData(e.currentTarget)
+    const f = Object.fromEntries(new FormData(e.currentTarget))
     try {
-      await post('/auth/login', { username: f.get('username'), password: f.get('password') })
+      await post(register ? '/auth/register' : '/auth/login', f)
       await qc.invalidateQueries({ queryKey: ['me'] })
       navigate('/feed')
     } catch (err) {
@@ -33,20 +34,51 @@ export default function Landing() {
 
       <div className="relative mx-auto flex min-h-screen max-w-6xl items-center px-6 py-16">
         <div className="w-full max-w-md">
-          <h1 className="text-5xl leading-[1.05] font-semibold tracking-tight">Welcome to Keystone</h1>
+          <h1 className="text-5xl leading-[1.05] font-semibold tracking-tight">
+            {register ? 'Join Keystone' : 'Welcome to Keystone'}
+          </h1>
           <p className="mt-4 text-lg text-slate">A portfolio AI can't fake.</p>
 
-          <form onSubmit={signIn} className="mt-8 flex flex-col gap-4">
+          <form key={String(register)} onSubmit={signIn} className="mt-8 flex flex-col gap-4">
+            {register && (
+              <>
+                <label>
+                  <span className="mb-1.5 block text-sm font-medium">Full name</span>
+                  <input id="name" name="name" required autoComplete="name" className={field} />
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-sm font-medium">Email</span>
+                  <input id="email" name="email" type="email" required autoComplete="email" className={field} />
+                </label>
+              </>
+            )}
             <label>
               <span className="mb-1.5 block text-sm font-medium">Username</span>
-              <input id="username" name="username" required autoComplete="username" className={field} />
+              <input id="username" name="username" required minLength={3} autoComplete="username" className={field} />
             </label>
             <label>
               <span className="mb-1.5 block text-sm font-medium">Password</span>
-              <input id="password" name="password" type="password" required autoComplete="current-password" placeholder="Enter your password" className={field} />
+              <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                minLength={register ? 12 : undefined}
+                autoComplete={register ? 'new-password' : 'current-password'}
+                placeholder={register ? 'At least 12 characters' : 'Enter your password'}
+                className={field}
+              />
             </label>
             {error && <p className="text-sm text-red-600">{error}</p>}
-            <button className="h-12 rounded-xl bg-brand font-medium text-white shadow-lg shadow-brand/25 hover:bg-brand-hover">Sign in</button>
+            <button className="h-12 rounded-xl bg-brand font-medium text-white shadow-lg shadow-brand/25 hover:bg-brand-hover">
+              {register ? 'Create account' : 'Sign in'}
+            </button>
+            <p className="text-center text-sm text-slate">
+              {register ? 'Already have an account? ' : 'New to Keystone? '}
+              <Link to={register ? '/' : '/register'} onClick={() => setError('')} className="font-medium text-brand underline underline-offset-2">
+                {register ? 'Sign in' : 'Create an account'}
+              </Link>
+            </p>
           </form>
 
           <div className="my-6 flex items-center gap-4 text-sm text-slate">

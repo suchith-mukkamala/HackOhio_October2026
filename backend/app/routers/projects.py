@@ -17,7 +17,7 @@ from ..models import (
     PublicUser,
     User,
 )
-from ..services import claude, github
+from ..services import ai, github
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -138,7 +138,7 @@ def draft_log(project_id: int, user: User = Depends(current_user), session: Sess
         raise HTTPException(400, "No new commits since the last log")
     readme = github.readme(user.github_token, project.repo_full_name)
     try:
-        draft = claude.draft_log(project.title, project.description, commits, readme)
+        draft = ai.draft_log(project.title, project.description, commits, readme)
     except RuntimeError as e:
         raise HTTPException(502, str(e))
     return {

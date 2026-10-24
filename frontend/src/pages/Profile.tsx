@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { Briefcase, Github, GraduationCap, MessageSquare } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Briefcase, Github, GraduationCap, MessageSquare, Upload } from 'lucide-react'
 import Avatar from '../components/Avatar'
 import SkillGraphView from '../components/SkillGraphView'
 import { api } from '../lib/api'
@@ -11,6 +12,7 @@ interface ProfileData {
   user: User
   projects: Project[]
   endorsements: { id: number }[]
+  experience: { id: number; kind: 'work' | 'education'; title: string; org: string; start: string; end: string; summary: string }[]
 }
 
 // Evidence kinds, weakest to strongest (see backend/app/services/skills.py)
@@ -44,9 +46,23 @@ export default function Profile() {
   const { data: me } = useMe()
   const profile = useQuery({ queryKey: ['user', id], queryFn: () => api<ProfileData>(`/users/${id}`) })
   const graph = useQuery({ queryKey: ['skills', id], queryFn: () => api<SkillGraph>(`/users/${id}/skills`) })
+  const qc = useQueryClient()
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+
+  async function uploadResume(file: File) {
+    setUploading(true)
+    setUploadError('')
+    const body = new FormData()
+    body.append('file', file)
+    const res = await fetch('/api/me/resume', { method: 'POST', body, credentials: 'include' })
+    if (!res.ok) setUploadError((await res.json().catch(() => ({}))).detail ?? 'Upload failed.')
+    await qc.invalidateQueries({ queryKey: ['user', id] })
+    setUploading(false)
+  }
 
   if (!profile.data) return <p className="text-muted">{profile.isError ? 'Profile not found.' : 'Loading…'}</p>
-  const { user, projects, endorsements } = profile.data
+  const { user, projects, endorsements, experience } = profile.data
   const skills = (graph.data?.nodes ?? []).filter((n) => n.tier in KINDS)
   const evidence = skills.flatMap((n) => n.evidence.map((e) => ({ ...e, skill: n.skill })))
   const handle = user.github_username ?? user.name.toLowerCase().replace(/[^a-z]+/g, '-')
@@ -108,6 +124,37 @@ export default function Profile() {
               ))}
             </ul>
           </div>
+        </section>
+
+        <section>
+          <div className="flex items-start justify-between gap-3">
+            <Label>experience</Label>
+            {me?.id === user.id && (
+              <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-edge px-3 py-1.5 text-sm hover:border-accent">
+                <Upload size={15} /> {uploading ? 'Reading resume…' : 'Upload resume'}
+                <input id="resume" type="file" accept="application/pdf" hidden disabled={uploading} onChange={(e) => e.target.files?.[0] && uploadResume(e.target.files[0])} />
+              </label>
+            )}
+          </div>
+          {uploadError && <p className="mb-3 text-sm text-warn">{uploadError}</p>}
+          {experience.length === 0 && (
+            <p className="text-sm text-muted">{me?.id === user.id ? 'Upload a PDF resume to fill this in.' : 'No experience added yet.'}</p>
+          )}
+          <ol className="border-l border-edge">
+            {experience.map((x) => (
+              <li key={x.id} className="relative py-2.5 pl-6">
+                <span className="absolute top-3.5 -left-[13px] grid h-6 w-6 place-items-center rounded-full bg-tile text-muted ring-4 ring-base">
+                  {x.kind === 'education' ? <GraduationCap size={13} /> : <Briefcase size={13} />}
+                </span>
+                <p className="font-semibold">
+                  {x.title} <span className="font-normal text-muted">· {x.org}</span>
+                </p>
+                <p className="font-mono text-xs text-muted">{[x.start, x.end].filter(Boolean).join(' → ')}</p>
+                {x.summary && <p className="mt-1 text-sm text-ink/80">{x.summary}</p>}
+              </li>
+            ))}
+          </ol>
+          {experience.length > 0 && <p className="mt-2 font-mono text-xs text-muted">from resume · self-reported</p>}
         </section>
 
         <section>
