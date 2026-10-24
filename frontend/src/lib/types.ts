@@ -12,6 +12,8 @@ export interface User {
   bio?: string
   avatar_url?: string
   github_username?: string
+  github_username?: string
+  is_admin?: boolean
   expertise_tags: string[]
 }
 
