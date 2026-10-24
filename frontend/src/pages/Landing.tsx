@@ -6,7 +6,12 @@ import type { User } from '../lib/types'
 export default function Landing() {
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const personas = useQuery({ queryKey: ['personas'], queryFn: () => api<User[]>('/auth/demo/personas') })
+  const personas = useQuery({
+    queryKey: ['personas'],
+    queryFn: () => api<User[]>('/auth/demo/personas'),
+    retry: 10, // the API starts a moment after Vite under npm run dev
+    retryDelay: 1000,
+  })
 
   async function signInAs(id: number) {
     await post(`/auth/demo/${id}`)
