@@ -3,6 +3,7 @@
 /* Light palette from the Flash sign-in page; dark palette from the Flash dashboard. */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   --color-paper: #f8f7f9;
   --color-navy: #14213d;
