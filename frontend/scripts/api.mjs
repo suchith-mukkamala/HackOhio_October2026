@@ -12,5 +12,8 @@ if (!existsSync(python)) {
   process.exit(1)
 }
 
-spawn(python, ['-m', 'uvicorn', 'app.main:app', '--reload', '--reload-dir', 'app', '--port', '8000'], { cwd: backend, stdio: 'inherit' })
+// On Windows, uvicorn's reload sends a Ctrl+C to its whole console, which also killed Vite.
+// A separate (hidden) console keeps that Ctrl+C inside the backend.
+const isWindows = process.platform === 'win32'
+spawn(python, ['-m', 'uvicorn', 'app.main:app', '--reload', '--reload-dir', 'app', '--port', '8000'], { cwd: backend, stdio: 'inherit', detached: isWindows, windowsHide: true })
   .on('exit', (code) => process.exit(code ?? 0))
