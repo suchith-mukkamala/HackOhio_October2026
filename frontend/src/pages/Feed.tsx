@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CircleCheck, CircleHelp, Lightbulb, Send } from 'lucide-react'
 import './Feed.css'
 import HomeSidebar from '../components/HomeSidebar'
+import { Ladder, OrgsCard } from '../components/Community'
 import Avatar from '../components/Avatar'
 import { api, post } from '../lib/api'
 import { headline, useMe } from '../lib/auth'
@@ -180,17 +181,21 @@ export default function Feed() {
   return (
     <div className={me ? 'home-feed grid w-full min-w-0 items-start gap-4 md:grid-cols-[11rem_minmax(0,1fr)] lg:grid-cols-[11rem_minmax(0,1fr)_15rem] xl:gap-5' : 'mx-auto max-w-2xl'}>
       {me && (
-        <Link to={`/u/${me.id}`} className="sticky top-20 hidden overflow-hidden rounded-2xl border border-edge bg-card text-center md:block">
-          <div className="h-14 bg-gradient-to-r from-brand via-accent to-avatar" />
-          <span className="-mt-8 inline-block rounded-full ring-4 ring-card">
-            <Avatar user={me} size={64} />
-          </span>
-          <p className="mt-2 break-words px-4 font-semibold">{me.name}</p>
-          <p className="break-words px-4 pb-4 text-sm text-muted">{headline(me)}</p>
-          <p className="border-t border-edge py-3 text-sm font-medium text-accent">View profile</p>
-        </Link>
+        <div className="sticky top-20 hidden flex-col gap-4 md:flex">
+          <Link to={`/u/${me.id}`} className="overflow-hidden rounded-2xl border border-edge bg-card text-center">
+            <div className="h-14 bg-gradient-to-r from-brand via-accent to-avatar" />
+            <span className="-mt-8 inline-block rounded-full ring-4 ring-card">
+              <Avatar user={me} size={64} />
+            </span>
+            <p className="mt-2 break-words px-4 font-semibold">{me.name}</p>
+            <p className="break-words px-4 pb-4 text-sm text-muted">{headline(me)}</p>
+            <p className="border-t border-edge py-3 text-sm font-medium text-accent">View profile</p>
+          </Link>
+          <OrgsCard />
+        </div>
       )}
-      <div className="flex min-w-0 flex-col gap-4">
+      <div id="feed" className="flex min-w-0 flex-col gap-4">
+        {me?.role === 'student' && <Ladder />}
         <Composer onPosted={refresh} />
         {feed.data?.length === 0 && <p className="text-muted">Nothing here yet. Post the first update.</p>}
         {feed.data?.map((item) => <PostCard key={item.post.id} item={item} meId={me?.id} onChange={refresh} />)}
