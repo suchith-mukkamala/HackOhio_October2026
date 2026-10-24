@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import Landing from './pages/Landing'
-import Feed from './pages/Feed'
+import Home from './pages/Home'
 import Explore from './pages/Explore'
 import NewProject from './pages/NewProject'
 import ProjectPage from './pages/ProjectPage'
@@ -15,7 +15,7 @@ export default function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/register" element={<Landing register />} />
       <Route element={<Layout />}>
-        <Route path="/feed" element={<Feed />} />
+        <Route path="/feed" element={<Home />} />
         <Route path="/explore" element={<Explore />} />
         <Route path="/projects/new" element={<NewProject />} />
         <Route path="/projects/:id" element={<ProjectPage />} />

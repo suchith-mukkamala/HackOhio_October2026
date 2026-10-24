@@ -10,10 +10,12 @@ export default function Landing({ register = false }: { register?: boolean }) {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [error, setError] = useState('')
+  const [role, setRole] = useState<'student' | 'faculty' | 'mentor'>('student')
 
   async function signIn(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const f = Object.fromEntries(new FormData(e.currentTarget))
+    // Leave out empty optional fields (major, title...) instead of saving blanks
+    const f = Object.fromEntries([...new FormData(e.currentTarget)].filter(([, v]) => v !== ''))
     try {
       await post(register ? '/auth/register' : '/auth/login', f)
       await qc.invalidateQueries({ queryKey: ['me'] })
@@ -42,6 +44,28 @@ export default function Landing({ register = false }: { register?: boolean }) {
           <form key={String(register)} onSubmit={signIn} className="mt-8 flex flex-col gap-4">
             {register && (
               <>
+                <fieldset>
+                  <legend className="mb-1.5 text-sm font-medium">I am a…</legend>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([['student', 'Student'], ['faculty', 'Faculty'], ['mentor', 'Industry pro']] as const).map(([value, label]) => (
+                      <label key={value} className={`cursor-pointer rounded-xl border px-3 py-2.5 text-center text-sm font-medium ${role === value ? 'border-brand bg-brand/10 text-brand' : 'border-line bg-white hover:border-brand'}`}>
+                        <input type="radio" name="role" value={value} checked={role === value} onChange={() => setRole(value)} className="sr-only" />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                {role === 'student' ? (
+                  <div className="grid grid-cols-[1fr_8rem] gap-3">
+                    <input id="major" name="major" placeholder="Major" className={field} />
+                    <input id="year" name="year" placeholder="Year" className={field} />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <input id="title" name="title" placeholder={role === 'faculty' ? 'Title (e.g. Professor)' : 'Job title'} className={field} />
+                    <input id="company" name="company" placeholder={role === 'faculty' ? 'Department' : 'Company'} className={field} />
+                  </div>
+                )}
                 <label>
                   <span className="mb-1.5 block text-sm font-medium">Full name</span>
                   <input id="name" name="name" required autoComplete="name" className={field} />
