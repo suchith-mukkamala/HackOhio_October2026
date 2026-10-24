@@ -2,7 +2,7 @@ import base64
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
-from sqlmodel import Session, SQLModel, select
+from sqlmodel import Field, Session, SQLModel, select  # CHANGED: added Field
 
 from ..auth import current_user
 from ..db import get_session
@@ -12,11 +12,13 @@ from ..services.skills import normalize, skill_graph, skill_vocabulary
 
 router = APIRouter(tags=["users"])
 
+BIO_MAX_LENGTH = 500  # NEW: keep in sync with BIO_MAX_LENGTH in frontend/src/pages/Profile.tsx
+
 
 class MeUpdate(SQLModel):
     """Fields a user may edit on their own profile. role and github_token are deliberately absent."""
 
-    bio: Optional[str] = None
+    bio: Optional[str] = Field(default=None, max_length=BIO_MAX_LENGTH)  # CHANGED: length limit
     major: Optional[str] = None
     year: Optional[str] = None
     company: Optional[str] = None
@@ -47,6 +49,11 @@ def update_me(body: MeUpdate, user: User = Depends(current_user), session: Sessi
             if unknown:
                 raise HTTPException(400, f"Unknown skills: {', '.join(unknown)}")
             changes["expertise_tags"] = tags
+
+    # NEW: trim whitespace; a blank bio clears it
+    if "bio" in changes:
+        bio = (changes["bio"] or "").strip()
+        changes["bio"] = bio or None
 
     for field, value in changes.items():
         setattr(user, field, value)
