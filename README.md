@@ -89,7 +89,9 @@ AI drafts, the student confirms, a mentor verifies. AI never writes the record b
 
 You need **Python 3.12+** and **Node 20+**.
 
-### 1. Backend
+### 1. One-time setup
+
+Backend (keep the venv at `backend/.venv`; `npm run dev` looks for it there):
 
 ```bash
 cd backend
@@ -102,20 +104,25 @@ Activate it (`source .venv/bin/activate` on macOS/Linux, `.venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
 python seed.py
-uvicorn app.main:app --reload
 ```
 
-The API runs at http://localhost:8000. Interactive docs are at **http://localhost:8000/api/docs**, which is the source of truth for the API contract.
-
-### 2. Frontend
+Frontend:
 
 ```bash
 cd frontend
 npm install
+```
+
+### 2. Run the app
+
+```bash
+cd frontend
 npm run dev
 ```
 
-Open http://localhost:5173. The landing page lists the seeded demo personas. Click one to sign in as that person.
+This one command starts both the backend and the frontend. Open **http://localhost:5173**. That's the only address you need, because Vite forwards `/api` to the backend behind the scenes. The landing page lists the seeded demo personas. Click one to sign in as that person.
+
+Interactive API docs are at **http://localhost:5173/api/docs**, which is the source of truth for the API contract. Use `npm run dev:web` if you only want the frontend.
 
 ### 3. GitHub sign-in (optional for local dev)
 
