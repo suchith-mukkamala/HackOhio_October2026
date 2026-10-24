@@ -1,0 +1,133 @@
+/* Colors are variables so the whole look can be changed in one place (your design system). */
+.skillgraph {
+  --sg-claimed: #b9a7f5;
+  --sg-code: #2fbfa6;
+  --sg-peer: #f2b134;
+  --sg-mentor: #ee4f8b;
+  --sg-branch: #8a8fa3;
+  position: relative;
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+.skillgraph svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* lines */
+.sg-tree {
+  stroke: currentColor;
+  stroke-opacity: 0.25;
+  stroke-width: 1.5;
+}
+.sg-co {
+  stroke: var(--sg-code);
+  stroke-opacity: 0.35;
+  stroke-dasharray: 4 5;
+  fill: none;
+}
+
+/* center */
+.sg-center circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-opacity: 0.5;
+  stroke-width: 2;
+}
+.sg-center text {
+  fill: currentColor;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* nodes */
+.sg-node {
+  cursor: pointer;
+  outline: none;
+}
+.sg-dot,
+.sg-halo {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.sg-halo {
+  opacity: 0;
+}
+.sg-label {
+  fill: currentColor;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.sg-claimed .sg-dot,
+.sg-claimed .sg-halo { fill: var(--sg-claimed); }
+.sg-code .sg-dot,
+.sg-code .sg-halo { fill: var(--sg-code); }
+.sg-peer .sg-dot,
+.sg-peer .sg-halo { fill: var(--sg-peer); }
+.sg-mentor .sg-dot,
+.sg-mentor .sg-halo { fill: var(--sg-mentor); }
+
+/* branches (categories and derived parents) are outlined, not filled */
+.sg-category .sg-dot,
+.sg-derived .sg-dot {
+  fill: none;
+  stroke: var(--sg-branch);
+  stroke-width: 2.5;
+}
+.sg-category .sg-halo,
+.sg-derived .sg-halo { fill: var(--sg-branch); }
+.sg-category .sg-label { font-weight: 600; font-size: 13px; }
+
+/* ring around a node that has collapsed children */
+.sg-more {
+  fill: none;
+  stroke: currentColor;
+  stroke-opacity: 0.45;
+  stroke-dasharray: 2 3;
+}
+
+.sg-node:hover .sg-dot,
+.sg-node:focus-visible .sg-dot,
+.sg-selected .sg-dot {
+  stroke: currentColor;
+  stroke-width: 3;
+}
+
+/* the pulse: faster and glowier as --dur gets shorter (set per node from its pulse value) */
+.sg-pulse .sg-dot {
+  animation: sg-beat var(--dur, 2s) ease-in-out infinite;
+}
+.sg-pulse .sg-halo {
+  animation: sg-glow var(--dur, 2s) ease-in-out infinite;
+}
+@keyframes sg-beat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}
+@keyframes sg-glow {
+  0%, 100% { transform: scale(0.9); opacity: 0.12; }
+  50% { transform: scale(1.4); opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sg-pulse .sg-dot,
+  .sg-pulse .sg-halo { animation: none; }
+  .sg-pulse .sg-halo { opacity: 0.25; }
+}
+
+/* detail panel */
+.sg-panel {
+  margin-top: 12px;
+  padding: 12px 16px;
+  border: 1px solid currentColor;
+  border-radius: 12px;
+  font-size: 14px;
+}
+.sg-panel h4 { margin: 0 0 4px; }
+.sg-panel p { margin: 0 0 6px; opacity: 0.8; }
+.sg-panel ul { margin: 0; padding-left: 18px; }
+.sg-tier { text-transform: capitalize; }
+.sg-empty { opacity: 0.7; text-align: center; padding: 32px 0; }

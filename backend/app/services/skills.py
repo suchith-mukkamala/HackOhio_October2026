@@ -3,6 +3,10 @@
 Score per skill = log(1 + code evidence) + 2 x peer endorsements
                   + 3 x mentor endorsements + 1 x helpful answers given.
 Tier is the strongest kind of evidence: claimed < code < peer < mentor.
+
+Hierarchy: every skill has a parent (another skill or a category), so the profile
+can render a tree (Programming -> Python -> FastAPI). Parents "pulse" by the
+strongest thing underneath them, so a category lights up when any child is strong.
 """
 
 import math
@@ -23,6 +27,35 @@ SKILLS = [
     "Public Speaking", "Debugging", "System Design", "Mobile Dev", "Swift", "Kotlin",
 ]
 
+# Top-level branches. They are not skills: nobody claims or is endorsed for them.
+CATEGORIES = ["Programming", "Web & Cloud", "Data & AI", "Hardware", "Design", "Professional"]
+
+# child -> parent. A parent is either a category or another skill (children can have children).
+PARENT = {
+    # Programming
+    "Python": "Programming", "JavaScript": "Programming", "C": "Programming", "C++": "Programming",
+    "Java": "Programming", "Rust": "Programming", "Go": "Programming", "Mobile Dev": "Programming",
+    "Debugging": "Programming", "Testing": "Programming",
+    "FastAPI": "Python",
+    "TypeScript": "JavaScript", "React": "JavaScript", "Node.js": "JavaScript",
+    "Swift": "Mobile Dev", "Kotlin": "Mobile Dev",
+    # Web & Cloud
+    "REST APIs": "Web & Cloud", "Auth / OAuth": "Web & Cloud", "SQL": "Web & Cloud", "AWS": "Web & Cloud",
+    "Docker": "Web & Cloud", "Git": "Web & Cloud", "CI/CD": "Web & Cloud", "System Design": "Web & Cloud",
+    "PostgreSQL": "SQL",
+    # Data & AI
+    "Machine Learning": "Data & AI", "Data Analysis": "Data & AI",
+    "Computer Vision": "Machine Learning", "NLP / LLMs": "Machine Learning",
+    "Prompt Engineering": "NLP / LLMs",
+    # Hardware
+    "Embedded Systems": "Hardware", "CAD": "Hardware",
+    "Arduino": "Embedded Systems", "ROS": "Embedded Systems",
+    # Design
+    "UI Design": "Design", "UX Research": "Design", "Figma": "UI Design",
+    # Professional
+    "Technical Writing": "Professional", "Project Management": "Professional", "Public Speaking": "Professional",
+}
+
 # GitHub language name -> vocabulary skill
 LANGUAGE_TO_SKILL = {
     "Python": "Python", "TypeScript": "TypeScript", "JavaScript": "JavaScript", "C": "C",
@@ -32,10 +65,52 @@ LANGUAGE_TO_SKILL = {
 
 TIER_RANK = {"claimed": 0, "code": 1, "peer": 2, "mentor": 3}
 
+TOP_N = 12  # how many evidenced skills to show; their ancestors are added on top
+
 
 def normalize(skill: str) -> str | None:
     lookup = {s.lower(): s for s in SKILLS}
     return lookup.get(skill.strip().lower())
+
+
+def skill_vocabulary() -> dict:
+    """Everything the onboarding picker needs to draw the full tree."""
+    return {
+        "categories": CATEGORIES,
+        "skills": [{"skill": s, "parent": PARENT.get(s)} for s in SKILLS],
+    }
+
+
+def build_hierarchy(top: list[str], score: dict[str, float]) -> list[dict]:
+    """Add ancestors of the shown skills and compute a 0..1 pulse for every node.
+
+    pulse = the strongest score at or below the node, divided by the strongest score overall.
+    Returns lightweight dicts: skill, parent, pulse, own (True if it has its own evidence).
+    """
+    keep = set(top)
+    for s in top:
+        p = PARENT.get(s)
+        while p and p not in keep:
+            keep.add(p)
+            p = PARENT.get(p)
+
+    children: dict[str, list[str]] = defaultdict(list)
+    for c in keep:
+        if PARENT.get(c) in keep:
+            children[PARENT[c]].append(c)
+
+    rolled: dict[str, float] = {}
+
+    def roll(s: str) -> float:
+        if s not in rolled:
+            rolled[s] = max([score.get(s, 0.0)] + [roll(c) for c in children[s]])
+        return rolled[s]
+
+    peak = max((roll(s) for s in keep), default=0.0) or 1.0
+    return [
+        {"skill": s, "parent": PARENT.get(s), "pulse": round(roll(s) / peak, 2), "own": s in top}
+        for s in keep
+    ]
 
 
 def skill_graph(session: Session, user: User) -> dict:
@@ -100,11 +175,25 @@ def skill_graph(session: Session, user: User) -> dict:
         for a, b in combinations(sorted(skills_here), 2):
             edge_weight[(a, b)] += 1
 
-    top = sorted(tier, key=lambda s: score[s], reverse=True)[:12]
+    top = sorted(tier, key=lambda s: score[s], reverse=True)[:TOP_N]
+    shown = build_hierarchy(top, score)
+    nodes = []
+    for h in shown:
+        s = h["skill"]
+        if h["own"]:
+            nodes.append(
+                {"skill": s, "parent": h["parent"], "score": round(score[s], 2), "pulse": h["pulse"],
+                 "tier": tier[s], "evidence": evidence[s]}
+            )
+        else:
+            # category, or a parent skill that only exists because a child is strong
+            kind = "category" if s in CATEGORIES else "derived"
+            nodes.append(
+                {"skill": s, "parent": h["parent"], "score": 0, "pulse": h["pulse"], "tier": kind, "evidence": []}
+            )
+
     return {
-        "nodes": [
-            {"skill": s, "score": round(score[s], 2), "tier": tier[s], "evidence": evidence[s]} for s in top
-        ],
+        "nodes": nodes,
         "edges": [
             {"a": a, "b": b, "weight": w} for (a, b), w in edge_weight.items() if a in top and b in top
         ],

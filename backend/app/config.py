@@ -1,12 +1,22 @@
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# Resolve .env and relative SQLite paths from backend/, not from wherever uvicorn was started
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BACKEND_DIR / ".env")
+
+
+def _database_url() -> str:
+    url = os.getenv("DATABASE_URL", "sqlite:///./keystone.db")
+    if url.startswith("sqlite:///./"):
+        url = f"sqlite:///{(BACKEND_DIR / url.removeprefix('sqlite:///./')).as_posix()}"
+    return url
 
 
 class Settings:
-    database_url = os.getenv("DATABASE_URL", "sqlite:///./keystone.db")
+    database_url = _database_url()
     jwt_secret = os.getenv("JWT_SECRET", "dev-secret-change-me")
     github_client_id = os.getenv("GITHUB_CLIENT_ID", "")
     github_client_secret = os.getenv("GITHUB_CLIENT_SECRET", "")
