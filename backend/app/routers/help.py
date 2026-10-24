@@ -6,6 +6,8 @@ from sqlmodel import Session, SQLModel, select
 from ..auth import current_user
 from ..db import get_session
 from ..models import Endorsement, HelpRequest, User
+from ..services.skills import normalize
+from .projects import require_member
 
 router = APIRouter(prefix="/help", tags=["help"])
 
@@ -36,6 +38,9 @@ def match_score(request: HelpRequest, mentor: User) -> float:
 def ask(body: HelpIn, user: User = Depends(current_user), session: Session = Depends(get_session)):
     if body.minutes not in (5, 15, 30):
         raise HTTPException(400, "Time ask must be 5, 15 or 30 minutes")
+    if not body.question.strip():
+        raise HTTPException(400, "Write your question first")
+    require_member(session, body.project_id, user)
     req = HelpRequest(requester_id=user.id, **body.model_dump())
     session.add(req)
     session.commit()
@@ -56,24 +61,48 @@ def inbox(user: User = Depends(current_user), session: Session = Depends(get_ses
 def answer(
     request_id: int, body: AnswerIn, user: User = Depends(current_user), session: Session = Depends(get_session)
 ):
+    if user.role not in ("mentor", "faculty"):
+        raise HTTPException(403, "Only mentors and faculty can answer help requests")
     req = session.get(HelpRequest, request_id)
     if not req:
         raise HTTPException(404, "Help request not found")
+    if req.requester_id == user.id:
+        raise HTTPException(403, "You can't answer your own request")
+    if req.status != "open":
+        raise HTTPException(400, "This request has already been answered")
+    if not body.answer.strip():
+        raise HTTPException(400, "Write an answer first")
+
+    skill = None
+    if body.endorse_skill:
+        skill = normalize(body.endorse_skill)
+        if not skill:
+            raise HTTPException(400, "Unknown skill. Pick one from /skills/vocabulary")
+
     req.answer = body.answer
     req.mentor_id = user.id
     req.status = "answered"
     session.add(req)
-    if body.endorse_skill:
-        session.add(
-            Endorsement(
-                from_id=user.id,
-                to_id=req.requester_id,
-                skill=body.endorse_skill,
-                project_id=req.project_id,
-                help_request_id=req.id,
-                note=body.endorse_note,
+
+    if skill:
+        already = session.exec(
+            select(Endorsement).where(
+                Endorsement.from_id == user.id,
+                Endorsement.to_id == req.requester_id,
+                Endorsement.skill == skill,
             )
-        )
+        ).first()
+        if not already:  # one endorsement per (mentor, student, skill), so scores can't be farmed
+            session.add(
+                Endorsement(
+                    from_id=user.id,
+                    to_id=req.requester_id,
+                    skill=skill,
+                    project_id=req.project_id,
+                    help_request_id=req.id,
+                    note=body.endorse_note,
+                )
+            )
     session.commit()
     session.refresh(req)
     return req
@@ -86,6 +115,8 @@ def helpful(request_id: int, user: User = Depends(current_user), session: Sessio
         raise HTTPException(404, "Help request not found")
     if req.requester_id != user.id:
         raise HTTPException(403, "Only the person who asked can mark an answer helpful")
+    if req.status != "answered":
+        raise HTTPException(400, "There's no answer to rate yet")
     req.helpful = True
     req.status = "resolved"
     session.add(req)

@@ -9,7 +9,7 @@ from pwdlib.exceptions import UnknownHashError
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from ..auth import COOKIE, set_session_cookie
+from ..auth import COOKIE, optional_user, set_session_cookie
 from ..config import settings
 from ..db import get_session
 from ..models import PublicUser, User
@@ -102,6 +102,15 @@ def login(
         "role": user.role,
     }
 
+
+def _state_ok(state: str, request: Request) -> bool:
+    expected = request.cookies.get("oauth_state")
+    return bool(expected) and secrets.compare_digest(state.encode(), expected.encode())
+
+
+# ---- GitHub ----------------------------------------------------------------
+
+
 @router.get("/github/login")
 def github_login():
     if not settings.github_client_id:
@@ -111,7 +120,9 @@ def github_login():
         {
             "client_id": settings.github_client_id,
             "redirect_uri": settings.github_redirect_uri,
-            "scope": "read:user repo",
+            # public_repo reads public repos' commits and READMEs. "repo" would grant
+            # full access to every private repo, which we don't need.
+            "scope": "read:user public_repo",
             "state": state,
         }
     )
@@ -121,9 +132,14 @@ def github_login():
 
 
 @router.get("/github/callback")
-def github_callback(code: str, state: str, request: Request, session: Session = Depends(get_session)):
-    expected_state = request.cookies.get("oauth_state")
-    if not expected_state or not secrets.compare_digest(state.encode(), expected_state.encode()):
+def github_callback(
+    code: str,
+    state: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User | None = Depends(optional_user),
+):
+    if not _state_ok(state, request):
         raise HTTPException(400, "Sign-in expired. Start again from the home page.")
     try:
         token = github.exchange_code(
@@ -133,20 +149,42 @@ def github_callback(code: str, state: str, request: Request, session: Session = 
     except (httpx.HTTPError, ValueError) as exc:
         raise HTTPException(502, "GitHub sign-in could not be completed. Please try again.") from exc
 
-    user = session.exec(select(User).where(User.github_username == gh_user["login"])).first()
+    login_name = gh_user["login"]
+    with_this_github = session.exec(select(User).where(User.github_username == login_name)).first()
+
+    if current:
+        # Already signed in: link GitHub to this account instead of making a second one.
+        if with_this_github and with_this_github.id != current.id:
+            raise HTTPException(409, "That GitHub account is already linked to another user.")
+        user = current
+    else:
+        user = with_this_github
+
     if not user:
-        user = User(name=gh_user.get("name") or gh_user["login"], github_username=gh_user["login"])
+        username = login_name
+        if session.exec(select(User).where(User.username == username)).first():
+            username = f"{login_name}-gh"
+        user = User(username=username, name=gh_user.get("name") or login_name)
+
+    user.github_username = login_name
     user.github_token = token
-    user.avatar_url = gh_user.get("avatar_url")
+    user.avatar_url = gh_user.get("avatar_url") or user.avatar_url
     user.bio = user.bio or gh_user.get("bio")
     session.add(user)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(409, "Could not create your account. Try again.")
     session.refresh(user)
 
     resp = RedirectResponse(f"{settings.frontend_url}/feed")
     set_session_cookie(resp, user.id)
     resp.delete_cookie("oauth_state")
     return resp
+
+
+# ---- Google ----------------------------------------------------------------
 
 
 @router.get("/google/login")
@@ -169,10 +207,15 @@ def google_login():
 
 
 @router.get("/google/callback")
-def google_callback(code: str, state: str, request: Request, session: Session = Depends(get_session)):
+def google_callback(
+    code: str,
+    state: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current: User | None = Depends(optional_user),
+):
     """Signs in the account with this Google email, or creates a student account for it."""
-    expected_state = request.cookies.get("oauth_state")
-    if not expected_state or not secrets.compare_digest(state.encode(), expected_state.encode()):
+    if not _state_ok(state, request):
         raise HTTPException(400, "Sign-in expired. Start again from the home page.")
     try:
         token = httpx.post(
@@ -196,10 +239,20 @@ def google_callback(code: str, state: str, request: Request, session: Session = 
 
     email = info["email"].lower()
     user = session.exec(select(User).where(User.email == email)).first()
+
+    if user and user.password_hash and not (current and current.id == user.id):
+        # Someone could have registered a password account with this email without proving
+        # they own it. Don't hand that account to whoever holds the Google address.
+        raise HTTPException(409, "An account with this email already exists. Sign in with your password.")
+
     if not user:
         user = User(name=info.get("name") or email, email=email, avatar_url=info.get("picture"))
         session.add(user)
-        session.commit()
+        try:
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+            raise HTTPException(409, "Could not create your account. Try again.")
         session.refresh(user)
 
     resp = RedirectResponse(f"{settings.frontend_url}/feed")
@@ -208,19 +261,31 @@ def google_callback(code: str, state: str, request: Request, session: Session = 
     return resp
 
 
+# ---- Demo ------------------------------------------------------------------
+
+
+def _is_demo_persona(user: User) -> bool:
+    """Seeded personas only: no password and no GitHub token. Real accounts can't be demo-logged-into."""
+    return not user.password_hash and not user.github_token
+
+
 @router.get("/demo/personas", response_model=list[PublicUser])
 def demo_personas(session: Session = Depends(get_session)):
     if not settings.demo_mode:
         return []
-    return session.exec(select(User).order_by(User.role, User.name)).all()
+    users = session.exec(select(User).order_by(User.role, User.name)).all()
+    return [u for u in users if _is_demo_persona(u)]
 
 
 @router.post("/demo/{user_id}", status_code=204)
 def demo_login(user_id: int, response: Response, session: Session = Depends(get_session)):
     if not settings.demo_mode:
         raise HTTPException(403, "Demo login is turned off")
-    if not session.get(User, user_id):
+    user = session.get(User, user_id)
+    if not user:
         raise HTTPException(404, "No such persona")
+    if not _is_demo_persona(user):
+        raise HTTPException(403, "That account is not a demo persona")
     set_session_cookie(response, user_id)
 
 

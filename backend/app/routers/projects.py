@@ -49,6 +49,10 @@ def get_project(session: Session, project_id: int) -> Project:
         raise HTTPException(404, "Project not found")
     return project
 
+def require_member(session: Session, project_id: int, user: User) -> None:
+    if not session.get(ProjectMember, (project_id, user.id)):
+        raise HTTPException(403, "Join this project first")
+
 
 @router.get("")
 def list_projects(q: str = "", tag: str = "", status: str = "active", session: Session = Depends(get_session)):
@@ -100,6 +104,18 @@ def project_detail(project_id: int, session: Session = Depends(get_session)):
 @router.post("/{project_id}/invite", response_model=Invite)
 def invite(project_id: int, to_id: int, user: User = Depends(current_user), session: Session = Depends(get_session)):
     get_project(session, project_id)
+    require_member(session, project_id, user)
+    if to_id == user.id:
+        raise HTTPException(400, "You can't invite yourself")
+    if not session.get(User, to_id):
+        raise HTTPException(404, "User not found")
+    if session.get(ProjectMember, (project_id, to_id)):
+        raise HTTPException(409, "They're already on this project")
+    pending = session.exec(
+        select(Invite).where(Invite.project_id == project_id, Invite.to_id == to_id, Invite.status == "pending")
+    ).first()
+    if pending:
+        raise HTTPException(409, "Invite already sent")
     inv = Invite(project_id=project_id, from_id=user.id, to_id=to_id)
     session.add(inv)
     session.commit()
@@ -126,6 +142,7 @@ def archive(project_id: int, user: User = Depends(current_user), session: Sessio
 def draft_log(project_id: int, user: User = Depends(current_user), session: Session = Depends(get_session)):
     """Pull commits since the last log and ask Claude for a draft. Nothing is saved."""
     project = get_project(session, project_id)
+    require_member(session, project_id, user)
     if not project.repo_full_name:
         raise HTTPException(400, "Link a GitHub repo to this project first")
     last = session.exec(
