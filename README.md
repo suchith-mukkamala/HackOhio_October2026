@@ -44,7 +44,7 @@ AI drafts, the student confirms, a mentor verifies. AI never writes the record b
 | Backend | Python, FastAPI, SQLModel on AWS RDS Postgres (no SQLite) |
 | AI | Structured output from OpenAI (log drafts from commits) and Claude (resume reading) |
 | Auth | GitHub OAuth, session in a signed JWT cookie, plus a demo persona picker |
-| Deploy | Frontend on Vercel; backend in Docker on AWS App Runner with RDS Postgres |
+| Deploy | Vercel (frontend + FastAPI backend as Vercel Services) with AWS RDS Postgres |
 
 ## Repo layout
 
@@ -77,8 +77,8 @@ AI drafts, the student confirms, a mentor verifies. AI never writes the record b
 │   │   ├── components/        # Layout, Stub
 │   │   ├── lib/               # api client, shared types, useMe()
 │   │   └── pages/             # one file per screen
-│   ├── vite.config.ts         # proxies /api to localhost:8000
-│   └── vercel.json            # rewrites /api to the backend in production
+│   └── vite.config.ts         # proxies /api to localhost:8000
+├── vercel.json                # Vercel Services: frontend at /, backend at /api
 └── docs/
     └── PLAN.md                # full hackathon plan: scope, timeline, ownership, pitch
 ```
@@ -193,6 +193,18 @@ The full plan (scope decisions, hour-by-hour timeline, demo script and risks) is
 
 ## Deploying
 
-1. **Backend:** build `backend/Dockerfile`, push to ECR, and create an App Runner service on port 8000 with the production env vars (`SECURE_COOKIES=true` and the `DB_*` fields).
-2. **Frontend:** import `frontend/` into Vercel and replace `REPLACE-WITH-APP-RUNNER-URL` in `frontend/vercel.json` with the App Runner URL. The rewrite keeps the frontend and API on one origin, so there are no CORS or cookie problems.
-3. **Fallback:** if AWS isn't working by H17, deploy the backend to Render or Railway, or record the demo on localhost. The judges score the video.
+**Live site: https://keystone-hackohio.vercel.app**
+
+Frontend and backend deploy together as one Vercel project using [Vercel Services](https://vercel.com/docs/services). The root `vercel.json` serves `frontend/` at `/` and runs the FastAPI app in `backend/` at `/api`, so everything is on one domain with no CORS or cookie setup. The database stays on AWS RDS, so every account works the same locally and live.
+
+**Redeploy** from the repo root (Vercel CLI, signed in to the account that owns the project):
+
+```bash
+vercel deploy --prod
+```
+
+- **Settings live in Vercel, not in git.** Add or change them in Vercel → Project → Settings → Environment Variables: the five `DB_*` fields, `JWT_SECRET`, `ANTHROPIC_API_KEY`, `CLAUDE_MODEL`, `OPENAI_API_KEY`, `SECURE_COOKIES=true`, `FRONTEND_URL`, and the GitHub/Google client IDs, secrets and redirect URIs. Redeploy after changing them.
+- **Sign-in callbacks** for the live site are `https://keystone-hackohio.vercel.app/api/auth/github/callback` and `.../google/callback`. Register them in the GitHub and Google OAuth apps.
+- **`.vercelignore`** keeps `.env`, `password.txt` and local environments out of uploads. Never remove those lines.
+- **"Commit author doesn't have permission"** means the GitHub account on your latest commit isn't linked to the Vercel account. Fix it in Vercel → Account Settings → Authentication → GitHub → Connect.
+- **Limits** (Hobby plan): requests up to 4.5 MB (resume uploads are capped at 4 MB) and functions up to 60 seconds.

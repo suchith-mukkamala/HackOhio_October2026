@@ -86,8 +86,8 @@ def profile(user_id: int, session: Session = Depends(get_session)):
 def upload_resume(file: UploadFile, user: User = Depends(current_user), session: Session = Depends(get_session)):
     """Read a PDF resume: replace work/education history (with skills for the graph), fill empty profile fields."""
     data = file.file.read()
-    if not data.startswith(b"%PDF") or len(data) > 10_000_000:
-        raise HTTPException(400, "Upload a PDF under 10 MB")
+    if not data.startswith(b"%PDF") or len(data) > 4_000_000:  # Vercel caps request bodies at 4.5 MB
+        raise HTTPException(400, "Upload a PDF under 4 MB")
     try:
         parsed = ai.parse_resume(base64.b64encode(data).decode())
     except RuntimeError as e:
