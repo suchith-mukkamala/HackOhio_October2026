@@ -297,36 +297,6 @@ export default function Profile() {
           </section>
         )}
 
-        <section>
-          <div className="flex items-start justify-between gap-3">
-            <Label>experience</Label>
-            {me?.id === user.id && (
-              <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-edge px-3 py-1.5 text-sm hover:border-accent">
-                <Upload size={15} /> {uploading ? 'Reading resume…' : 'Upload resume'}
-                <input id="resume" type="file" accept="application/pdf" hidden disabled={uploading} onChange={(e) => e.target.files?.[0] && uploadResume(e.target.files[0])} />
-              </label>
-            )}
-          </div>
-          {uploadError && <p className="mb-3 text-sm text-warn">{uploadError}</p>}
-          {experience.length === 0 && (
-            <p className="text-sm text-muted">{me?.id === user.id ? 'Upload a PDF resume to fill this in.' : 'No experience added yet.'}</p>
-          )}
-          <ol className="border-l border-edge">
-            {experience.map((x) => (
-              <li key={x.id} className="relative py-2.5 pl-6">
-                <span className="absolute top-3.5 -left-[13px] grid h-6 w-6 place-items-center rounded-full bg-tile text-muted ring-4 ring-base">
-                  {x.kind === 'education' ? <GraduationCap size={13} /> : <Briefcase size={13} />}
-                </span>
-                <p className="font-semibold">
-                  {x.title} <span className="font-normal text-muted">· {x.org}</span>
-                </p>
-                <p className="font-mono text-xs text-muted">{[x.start, x.end].filter(Boolean).join(' → ')}</p>
-                {x.summary && <p className="mt-1 text-sm text-ink/80">{x.summary}</p>}
-              </li>
-            ))}
-          </ol>
-          {experience.length > 0 && <p className="mt-2 font-mono text-xs text-muted">from resume · self-reported</p>}
-        </section>
 
         <section>
           <Label>pinned projects</Label>
@@ -340,6 +310,18 @@ export default function Profile() {
               </Link>
             ))}
           </div>
+        </section>
+
+        <section aria-label="Latest post">
+          <Label>latest post</Label>
+          {recentPosts.isPending && <p role="status" className="text-sm text-muted">Loading latest post...</p>}
+          {recentPosts.isError && <p role="alert" className="text-sm text-muted">Unable to load the latest post. <button onClick={() => void recentPosts.refetch()} className="text-accent hover:underline">Try again</button></p>}
+          {recentPosts.data?.length === 0 && <p className="text-sm text-muted">No posts yet.</p>}
+          {recentPosts.data?.slice(0, 1).map(({ post, log, project }) => <article key={post.id} className="rounded-xl border border-edge bg-card px-4 py-3">
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-2 text-xs text-muted"><span>{log ? 'Weekly log' : 'Post'}</span><time dateTime={post.created_at}>{new Date(/Z$|[+-]\d\d:\d\d$/.test(post.created_at) ? post.created_at : post.created_at + 'Z').toLocaleDateString()}</time></div>
+            <p className="line-clamp-2 whitespace-pre-wrap break-words text-sm text-ink/85">{log?.title ?? post.body}</p>
+            {project && <Link to={`/projects/${project.id}`} className="mt-2 inline-block max-w-full truncate text-xs text-accent hover:underline">{project.title}</Link>}
+          </article>)}
         </section>
 
         <section>
