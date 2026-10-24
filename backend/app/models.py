@@ -21,17 +21,18 @@ def json_list():
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
-    username: str = Field(
+    username: Optional[str] = Field(
+        default=None,
         index=True,
         unique=True,
         min_length=3,
         max_length=50,
     )
-    password_hash: str
+    password_hash: Optional[str] = None  # GitHub and demo users have no local password.
 
     role: str = "student"  # student | mentor | faculty
     name: str
-    email: Optional[str] = None
+    email: Optional[str] = Field(default=None, unique=True, index=True)
     major: Optional[str] = None
     year: Optional[str] = None
     company: Optional[str] = None

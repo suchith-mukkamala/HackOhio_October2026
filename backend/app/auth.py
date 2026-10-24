@@ -36,7 +36,7 @@ def current_user(request: Request, session: Session = Depends(get_session)) -> U
         raise HTTPException(401, "Not signed in")
     try:
         user_id = int(jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])["sub"])
-    except jwt.PyJWTError:
+    except (jwt.PyJWTError, ValueError, TypeError, KeyError):
         raise HTTPException(401, "Session expired, sign in again")
     user = session.get(User, user_id)
     if not user:
