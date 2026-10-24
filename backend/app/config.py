@@ -43,6 +43,10 @@ class Settings:
     anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "")  # resume reading
     claude_model = os.getenv("CLAUDE_MODEL", "claude-opus-5-5")
     demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
+    # Secret code that makes whoever types it an admin. Empty means admin access is turned off.
+    admin_code = os.getenv("ADMIN_CODE", "").strip()
+    # Usernames that are always admins, comma separated: neel,rohan,suchith,adi. Empty means none.
+    admin_usernames = [u.strip().lower() for u in os.getenv("ADMIN_USERNAMES", "").split(",") if u.strip()]
     # Cookies must be Secure behind HTTPS (App Runner / Vercel) but not on localhost
     secure_cookies = os.getenv("SECURE_COOKIES", "false").lower() == "true"
 
