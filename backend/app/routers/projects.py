@@ -104,6 +104,18 @@ def project_detail(project_id: int, session: Session = Depends(get_session)):
 @router.post("/{project_id}/invite", response_model=Invite)
 def invite(project_id: int, to_id: int, user: User = Depends(current_user), session: Session = Depends(get_session)):
     get_project(session, project_id)
+    require_member(session, project_id, user)
+    if to_id == user.id:
+        raise HTTPException(400, "You can't invite yourself")
+    if not session.get(User, to_id):
+        raise HTTPException(404, "User not found")
+    if session.get(ProjectMember, (project_id, to_id)):
+        raise HTTPException(409, "They're already on this project")
+    pending = session.exec(
+        select(Invite).where(Invite.project_id == project_id, Invite.to_id == to_id, Invite.status == "pending")
+    ).first()
+    if pending:
+        raise HTTPException(409, "Invite already sent")
     inv = Invite(project_id=project_id, from_id=user.id, to_id=to_id)
     session.add(inv)
     session.commit()
