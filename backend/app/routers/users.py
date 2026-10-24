@@ -7,7 +7,7 @@ from ..auth import current_user
 from ..db import get_session
 from ..models import Endorsement, Project, ProjectMember, PublicUser, User
 from ..services import github
-from ..services.skills import skill_graph
+from ..services.skills import skill_graph, skill_vocabulary
 
 router = APIRouter(tags=["users"])
 
@@ -61,6 +61,12 @@ def skills(user_id: int, session: Session = Depends(get_session)):
     if not user:
         raise HTTPException(404, "User not found")
     return skill_graph(session, user)
+
+
+@router.get("/skills/vocabulary")
+def vocabulary():
+    """The fixed skill tree, for the onboarding picker."""
+    return skill_vocabulary()
 
 
 @router.get("/github/repos")
