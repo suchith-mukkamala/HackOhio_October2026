@@ -19,3 +19,5 @@ dist/
 Thumbs.db
 
 /password.txt
+.vercel
+.env*

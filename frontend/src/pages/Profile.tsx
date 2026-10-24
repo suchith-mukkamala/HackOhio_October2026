@@ -12,7 +12,7 @@ interface ProfileData {
   user: User
   projects: Project[]
   endorsements: { id: number }[]
-  experience: { id: number; kind: 'work' | 'education'; title: string; org: string; start: string; end: string; summary: string }[]
+  experience: { id: number; kind: 'work' | 'education'; title: string; org: string; start: string; end: string; summary: string; skills: string[] }[]
 }
 
 // Evidence kinds, weakest to strongest (see backend/app/services/skills.py)
@@ -51,6 +51,7 @@ export default function Profile() {
   const qc = useQueryClient()
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  const [uploadNote, setUploadNote] = useState('')
 
   // NEW: bio editing state
   const [editingBio, setEditingBio] = useState(false)
@@ -86,12 +87,18 @@ export default function Profile() {
   async function uploadResume(file: File) {
     setUploading(true)
     setUploadError('')
+    setUploadNote('')
     const body = new FormData()
     body.append('file', file)
     try {
       const res = await fetch('/api/me/resume', { method: 'POST', body, credentials: 'include' })
       if (!res.ok) setUploadError((await res.json().catch(() => ({}))).detail ?? 'Upload failed.')
-      else await qc.invalidateQueries({ queryKey: ['user', id] })
+      else {
+        const r: { entries: number; skills: string[]; filled: string[] } = await res.json()
+        setUploadNote(`Added ${r.entries} entries and ${r.skills.length} skills to your graph${r.filled.length ? `, and filled in your ${r.filled.join(' and ')}` : ''}.`)
+      }
+      // The resume can change the graph and empty profile fields, not just the timeline
+      await Promise.all([['user', id], ['skills', id], ['me']].map((queryKey) => qc.invalidateQueries({ queryKey })))
     } catch {
       setUploadError('Upload failed. Please try again.')
     } finally {
@@ -243,6 +250,7 @@ export default function Profile() {
             </label>
           )}
           {uploadError && <p role="alert" className="mb-3 text-sm text-warn">{uploadError}</p>}
+          {uploadNote && <p className="mb-3 text-sm text-good">{uploadNote}</p>}
           {!experience?.length && <p className="text-sm text-muted">No experience listed yet.</p>}
           <ul className="space-y-3">
             {(experience ?? []).map(entry => (
@@ -251,6 +259,11 @@ export default function Profile() {
                 <p className="mt-1 text-sm text-muted">{entry.org}</p>
                 <p className="mt-1 font-mono text-xs text-muted">{[entry.start, entry.end].filter(Boolean).join(' - ')}</p>
                 {entry.summary && <p className="mt-2 text-sm text-ink/85">{entry.summary}</p>}
+                {entry.skills?.length > 0 && (
+                  <p className="mt-2 flex flex-wrap gap-1.5">
+                    {entry.skills.map((skill) => <span key={skill} className="rounded-full bg-tile px-2 py-0.5 font-mono text-xs text-muted">{skill}</span>)}
+                  </p>
+                )}
               </li>
             ))}
           </ul>

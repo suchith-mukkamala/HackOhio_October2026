@@ -1,0 +1,10 @@
+# Never upload secrets or local environments to Vercel; set secrets as Vercel env vars instead
+.env
+**/.env
+password.txt
+**/.venv
+**/node_modules
+**/__pycache__
+**/*.db
+.claude
+.env.local
