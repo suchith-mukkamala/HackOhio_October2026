@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Compass, Home, Inbox, LogOut, MessageSquare, Plus, Search } from 'lucide-react'
+import { Compass, Home, Inbox, LogOut, MessageSquare, Plus, Search, Shield } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import Avatar from './Avatar'
 import { post } from '../lib/api'
@@ -56,6 +56,7 @@ export default function Layout() {
             <Tab to="/explore" icon={Compass} label="Explore" />
             <Tab to="/messages" icon={MessageSquare} label="Messages" />
             {isMentor ? <Tab to="/mentor" icon={Inbox} label="Help inbox" /> : <Tab to="/projects/new" icon={Plus} label="Project" />}
+            {me?.is_admin && <Tab to="/admin" icon={Shield} label="Admin" />}
             {me && (
               <NavLink
                 to={`/u/${me.id}`}
