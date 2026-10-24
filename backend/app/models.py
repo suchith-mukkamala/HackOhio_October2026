@@ -189,3 +189,18 @@ class ProfileSettingsRecord(SQLModel, table=True):
     data: dict = Field(default_factory=dict, sa_column=Column(JSON))
     google_sub: Optional[str] = Field(default=None, unique=True, index=True)
     google_email: Optional[str] = None
+
+
+class Club(SQLModel, table=True):
+    """A student org: where people already belong, so it's how they find teammates here."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)
+    kind: str = ""  # e.g. "Engineering team", "Design", "Cultural"
+    blurb: str = ""
+    color: str = "#4f8cff"  # accent dot on the card
+
+
+class ClubMember(SQLModel, table=True):
+    club_id: int = Field(foreign_key="club.id", primary_key=True)
+    user_id: int = Field(foreign_key="user.id", primary_key=True)
