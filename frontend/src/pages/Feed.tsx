@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CircleCheck, CircleHelp, Lightbulb, Send } from 'lucide-react'
 import Avatar from '../components/Avatar'
 import { api, post } from '../lib/api'
-import { useMe } from '../lib/auth'
+import { headline, useMe } from '../lib/auth'
 import type { FeedItem, LogEntry } from '../lib/types'
 
 const ago = (iso: string) => {
@@ -174,11 +174,23 @@ export default function Feed() {
   const refresh = () => qc.invalidateQueries({ queryKey: ['feed'] })
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Feed</h1>
-      <Composer onPosted={refresh} />
-      {feed.data?.length === 0 && <p className="text-muted">Nothing here yet. Post the first update.</p>}
-      {feed.data?.map((item) => <PostCard key={item.post.id} item={item} meId={me?.id} onChange={refresh} />)}
+    <div className="grid items-start gap-6 md:grid-cols-[15rem_1fr]">
+      {me && (
+        <Link to={`/u/${me.id}`} className="sticky top-20 hidden overflow-hidden rounded-2xl border border-edge bg-card text-center md:block">
+          <div className="h-14 bg-gradient-to-r from-brand via-accent to-avatar" />
+          <span className="-mt-8 inline-block rounded-full ring-4 ring-card">
+            <Avatar user={me} size={64} />
+          </span>
+          <p className="mt-2 px-4 font-semibold">{me.name}</p>
+          <p className="px-4 pb-4 text-sm text-muted">{headline(me)}</p>
+          <p className="border-t border-edge py-3 text-sm font-medium text-accent">View profile</p>
+        </Link>
+      )}
+      <div className="flex max-w-2xl flex-col gap-4">
+        <Composer onPosted={refresh} />
+        {feed.data?.length === 0 && <p className="text-muted">Nothing here yet. Post the first update.</p>}
+        {feed.data?.map((item) => <PostCard key={item.post.id} item={item} meId={me?.id} onChange={refresh} />)}
+      </div>
     </div>
   )
 }
