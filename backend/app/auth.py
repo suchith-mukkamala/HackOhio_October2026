@@ -35,10 +35,24 @@ def current_user(request: Request, session: Session = Depends(get_session)) -> U
     if not token:
         raise HTTPException(401, "Not signed in")
     try:
-        user_id = int(jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])["sub"])
+        payload = jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=[ALGORITHM],
+            options={"require": ["exp", "sub"]},
+        )
+        user_id = int(payload["sub"])
     except (jwt.PyJWTError, ValueError, TypeError, KeyError):
         raise HTTPException(401, "Session expired, sign in again")
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(401, "User no longer exists")
     return user
+
+
+def optional_user(request: Request, session: Session = Depends(get_session)) -> User | None:
+    """Like current_user, but returns None instead of raising 401."""
+    try:
+        return current_user(request, session)
+    except HTTPException:
+        return None
