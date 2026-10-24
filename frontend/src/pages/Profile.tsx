@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Briefcase, Github, GraduationCap, MessageSquare } from 'lucide-react'
 import Avatar from '../components/Avatar'
+import SkillGraphView from '../components/SkillGraphView'
 import { api } from '../lib/api'
 import { headline, useMe } from '../lib/auth'
 import type { Project, SkillGraph, User } from '../lib/types'
@@ -87,14 +88,18 @@ export default function Profile() {
       </aside>
 
       <div className="flex min-w-0 flex-col gap-8">
-        {/* Centerpiece: the skill graph component drops into this slot */}
+        {/* Centerpiece: the skill graph */}
         <section>
           <Label>skill graph</Label>
           <div
             id="skill-graph-slot"
-            className="relative grid h-[26rem] place-items-center overflow-hidden rounded-2xl border border-edge bg-card bg-[radial-gradient(var(--color-edge)_1px,transparent_1px)] bg-[size:20px_20px]"
+            className="relative overflow-hidden rounded-2xl border border-edge bg-card bg-[radial-gradient(var(--color-edge)_1px,transparent_1px)] bg-[size:20px_20px] p-4 pb-12"
           >
-            <p className="font-mono text-sm text-muted">nodes render here</p>
+            {graph.data ? (
+              <SkillGraphView graph={graph.data} name={user.name} />
+            ) : (
+              <p className="py-24 text-center font-mono text-sm text-muted">Loading…</p>
+            )}
             <ul className="absolute bottom-3 left-4 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted">
               {Object.entries(KINDS).map(([k, v]) => (
                 <li key={k} className="flex items-center gap-1.5">

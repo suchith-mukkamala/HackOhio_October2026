@@ -62,12 +62,15 @@ def list_projects(q: str = "", tag: str = "", status: str = "active", session: S
 
 @router.post("", response_model=Project)
 def create_project(body: ProjectIn, user: User = Depends(current_user), session: Session = Depends(get_session)):
+    if user.role != "student":
+        raise HTTPException(403, "Only students can publish projects")
     project = Project(owner_id=user.id, **body.model_dump())
     session.add(project)
     session.commit()
     session.refresh(project)
     session.add(ProjectMember(project_id=project.id, user_id=user.id, role="owner"))
     session.commit()
+    session.refresh(project)  # the second commit expires it; without this the API returns {}
     return project
 
 
@@ -158,6 +161,7 @@ def publish_log(
     session.refresh(entry)
     session.add(Post(author_id=user.id, project_id=project_id, log_entry_id=entry.id, body=entry.title, type="log"))
     session.commit()
+    session.refresh(entry)
     return entry
 
 

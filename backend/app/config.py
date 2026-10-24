@@ -23,10 +23,13 @@ class Settings:
     github_redirect_uri = os.getenv(
         "GITHUB_REDIRECT_URI", "http://localhost:8000/api/auth/github/callback"
     )
+    google_client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+    google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    google_redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:5173/api/auth/google/callback")
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
     anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "")
     claude_model = os.getenv("CLAUDE_MODEL", "claude-opus-5-5")
-    demo_mode = os.getenv("DEMO_MODE", "true").lower() == "true"
+    demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
     # Cookies must be Secure behind HTTPS (App Runner / Vercel) but not on localhost
     secure_cookies = os.getenv("SECURE_COOKIES", "false").lower() == "true"
 

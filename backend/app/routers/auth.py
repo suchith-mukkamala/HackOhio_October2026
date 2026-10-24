@@ -149,6 +149,65 @@ def github_callback(code: str, state: str, request: Request, session: Session = 
     return resp
 
 
+@router.get("/google/login")
+def google_login():
+    if not settings.google_client_id:
+        raise HTTPException(500, "GOOGLE_CLIENT_ID is not set in backend/.env")
+    state = secrets.token_urlsafe(16)
+    query = urlencode(
+        {
+            "client_id": settings.google_client_id,
+            "redirect_uri": settings.google_redirect_uri,
+            "response_type": "code",
+            "scope": "openid email profile",
+            "state": state,
+        }
+    )
+    resp = RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{query}")
+    resp.set_cookie("oauth_state", state, httponly=True, max_age=600, samesite="lax", secure=settings.secure_cookies)
+    return resp
+
+
+@router.get("/google/callback")
+def google_callback(code: str, state: str, request: Request, session: Session = Depends(get_session)):
+    """Signs in the account with this Google email, or creates a student account for it."""
+    expected_state = request.cookies.get("oauth_state")
+    if not expected_state or not secrets.compare_digest(state.encode(), expected_state.encode()):
+        raise HTTPException(400, "Sign-in expired. Start again from the home page.")
+    try:
+        token = httpx.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "client_id": settings.google_client_id,
+                "client_secret": settings.google_client_secret,
+                "code": code,
+                "redirect_uri": settings.google_redirect_uri,
+                "grant_type": "authorization_code",
+            },
+            timeout=15,
+        ).raise_for_status().json()["access_token"]
+        info = httpx.get(
+            "https://openidconnect.googleapis.com/v1/userinfo", headers={"Authorization": f"Bearer {token}"}, timeout=15
+        ).raise_for_status().json()
+    except (httpx.HTTPError, KeyError) as exc:
+        raise HTTPException(502, "Google sign-in could not be completed. Please try again.") from exc
+    if not info.get("email_verified"):
+        raise HTTPException(400, "Your Google email isn't verified.")
+
+    email = info["email"].lower()
+    user = session.exec(select(User).where(User.email == email)).first()
+    if not user:
+        user = User(name=info.get("name") or email, email=email, avatar_url=info.get("picture"))
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+    resp = RedirectResponse(f"{settings.frontend_url}/feed")
+    set_session_cookie(resp, user.id)
+    resp.delete_cookie("oauth_state")
+    return resp
+
+
 @router.get("/demo/personas", response_model=list[PublicUser])
 def demo_personas(session: Session = Depends(get_session)):
     if not settings.demo_mode:
