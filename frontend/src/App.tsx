@@ -8,6 +8,7 @@ import ProjectPage from './pages/ProjectPage'
 import Profile from './pages/Profile'
 import MentorInbox from './pages/MentorInbox'
 import Messages from './pages/Messages'
+import Admin from './pages/Admin'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="/u/:id" element={<Profile />} />
         <Route path="/mentor" element={<MentorInbox />} />
         <Route path="/messages" element={<Messages />} />
+        <Route path="/admin" element={<Admin />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
