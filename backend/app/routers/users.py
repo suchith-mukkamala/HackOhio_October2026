@@ -8,7 +8,7 @@ from ..auth import current_user
 from ..db import get_session
 from ..models import Endorsement, Experience, Project, ProjectMember, PublicUser, User
 from ..services import ai, github
-from ..services.skills import skill_graph, skill_vocabulary
+from ..services.skills import normalize, skill_graph, skill_vocabulary
 
 router = APIRouter(tags=["users"])
 
@@ -31,7 +31,24 @@ def me(user: User = Depends(current_user)):
 
 @router.put("/me", response_model=PublicUser)
 def update_me(body: MeUpdate, user: User = Depends(current_user), session: Session = Depends(get_session)):
-    for field, value in body.model_dump(exclude_unset=True).items():
+    changes = body.model_dump(exclude_unset=True)
+
+    if "expertise_tags" in changes:
+        raw_tags = changes.pop("expertise_tags")
+        if raw_tags is not None:  # an explicit null means "leave it alone"
+            tags: list[str] = []
+            unknown: list[str] = []
+            for raw in raw_tags:
+                skill = normalize(raw)
+                if not skill:
+                    unknown.append(raw)
+                elif skill not in tags:
+                    tags.append(skill)
+            if unknown:
+                raise HTTPException(400, f"Unknown skills: {', '.join(unknown)}")
+            changes["expertise_tags"] = tags
+
+    for field, value in changes.items():
         setattr(user, field, value)
     session.add(user)
     session.commit()
