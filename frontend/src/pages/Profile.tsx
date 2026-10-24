@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Briefcase, Github, GraduationCap, MessageSquare, Pencil, Upload } from 'lucide-react' // CHANGED: added Pencil
+import { Briefcase, Github, GraduationCap, MessageSquare, Pencil, Upload, X } from 'lucide-react' // CHANGED: added X
 import Avatar from '../components/Avatar'
 import SkillGraphView from '../components/SkillGraphView'
-import { ApiError, api, put } from '../lib/api' // CHANGED: added ApiError, put
+import { ApiError, api, put } from '../lib/api'
 import { headline, useMe } from '../lib/auth'
-import type { FeedItem, MeUpdate, Project, SkillGraph, User } from '../lib/types' // CHANGED: added MeUpdate
+import type { FeedItem, MeUpdate, Project, SkillGraph, SkillVocabulary, User } from '../lib/types' // CHANGED: added MeUpdate, SkillVocabulary
 
 interface ProfileData {
   user: User
@@ -37,7 +37,7 @@ function evidenceRing(kinds: string[]) {
   return `conic-gradient(${stops.join(', ')})`
 }
 
-const BIO_MAX_LENGTH = 500 // NEW: keep in sync with BIO_MAX_LENGTH in backend/app/routers/users.py
+const BIO_MAX_LENGTH = 500 // keep in sync with BIO_MAX_LENGTH in backend/app/routers/users.py
 
 const Label = ({ children }: { children: string }) => (
   <h2 className="mb-3 font-mono text-sm text-muted">{`// ${children}`}</h2>
@@ -52,21 +52,17 @@ export default function Profile() {
   const recentPosts = useQuery({ queryKey: ['user-posts', id, 1], queryFn: () => api<FeedItem[]>(`/users/${id}/posts?limit=1`) })
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
-
-  // NEW: bio editing state
   const [editingBio, setEditingBio] = useState(false)
   const [bioDraft, setBioDraft] = useState('')
   const [bioSaving, setBioSaving] = useState(false)
   const [bioError, setBioError] = useState('')
 
-  // NEW: open the editor, prefilled with the current bio
   function startEditingBio(current?: string) {
     setBioDraft(current ?? '')
     setBioError('')
     setEditingBio(true)
   }
 
-  // NEW: save the bio to PUT /me, then refresh the profile and the signed-in user
   async function saveBio() {
     setBioSaving(true)
     setBioError('')
@@ -84,20 +80,43 @@ export default function Profile() {
     }
   }
 
+  // NEW: skills editing
+  const isMe = me?.id === id
+  const vocabulary = useQuery({
+    queryKey: ['vocabulary'],
+    queryFn: () => api<SkillVocabulary>('/skills/vocabulary'),
+    enabled: isMe,
+  })
+  const [skillsSaving, setSkillsSaving] = useState(false)
+  const [skillsError, setSkillsError] = useState('')
+
+  // NEW: PUT /me replaces the whole expertise_tags list, so always send the full new list
+  async function saveSkills(next: string[]) {
+    setSkillsSaving(true)
+    setSkillsError('')
+    try {
+      await put<User>('/me', { expertise_tags: next } satisfies MeUpdate)
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['user', id] }),
+        qc.invalidateQueries({ queryKey: ['skills', id] }),
+        qc.invalidateQueries({ queryKey: ['me'] }),
+      ])
+    } catch (err) {
+      setSkillsError(err instanceof ApiError ? err.message : 'Could not save your skills.')
+    } finally {
+      setSkillsSaving(false)
+    }
+  }
+
   async function uploadResume(file: File) {
     setUploading(true)
     setUploadError('')
     const body = new FormData()
     body.append('file', file)
-    try {
-      const res = await fetch('/api/me/resume', { method: 'POST', body, credentials: 'include' })
-      if (!res.ok) setUploadError((await res.json().catch(() => ({}))).detail ?? 'Upload failed.')
-      else await qc.invalidateQueries({ queryKey: ['user', id] })
-    } catch {
-      setUploadError('Upload failed. Please try again.')
-    } finally {
-      setUploading(false)
-    }
+    const res = await fetch('/api/me/resume', { method: 'POST', body, credentials: 'include' })
+    if (!res.ok) setUploadError((await res.json().catch(() => ({}))).detail ?? 'Upload failed.')
+    await qc.invalidateQueries({ queryKey: ['user', id] })
+    setUploading(false)
   }
 
   if (!profile.data) return <p className="text-muted">{profile.isError ? 'Profile not found.' : 'Loading…'}</p>
@@ -105,6 +124,19 @@ export default function Profile() {
   const skills = (graph.data?.nodes ?? []).filter((n) => n.tier in KINDS)
   const evidence = skills.flatMap((n) => n.evidence.map((e) => ({ ...e, skill: n.skill })))
   const handle = user.github_username ?? user.name.toLowerCase().replace(/[^a-z]+/g, '-')
+
+  // NEW: the skills you can still add, grouped by top-level category for the dropdown
+  const parentOf = Object.fromEntries((vocabulary.data?.skills ?? []).map((v) => [v.skill, v.parent]))
+  const categories = vocabulary.data?.categories ?? []
+  const categoryOf = (skill: string) => {
+    let at: string | null | undefined = skill
+    while (at && !categories.includes(at)) at = parentOf[at]
+    return at ?? 'Other'
+  }
+  const addable = (vocabulary.data?.skills ?? []).map((v) => v.skill).filter((sk) => !user.expertise_tags.includes(sk))
+  const addableGroups = [...categories, 'Other']
+    .map((cat) => ({ cat, skills: addable.filter((sk) => categoryOf(sk) === cat) }))
+    .filter((g) => g.skills.length > 0)
 
   return (
     <div className="grid items-start gap-8 md:grid-cols-[17rem_1fr]">
@@ -119,8 +151,6 @@ export default function Profile() {
           <h1 className="text-2xl font-semibold">{user.name}</h1>
           <p className="font-mono text-muted">@{handle}</p>
         </div>
-
-        {/* CHANGED: bio is now editable on your own profile */}
         {editingBio ? (
           <div className="flex flex-col gap-2">
             <textarea
@@ -171,7 +201,6 @@ export default function Profile() {
             )}
           </>
         )}
-
         {me && me.id !== user.id && (
           <Link to={`/messages?to=${user.id}`} className="flex items-center justify-center gap-2 rounded-lg border border-edge bg-tile py-2 text-sm font-medium hover:border-accent">
             <MessageSquare size={16} /> Message
@@ -209,39 +238,108 @@ export default function Profile() {
               <p className="py-24 text-center font-mono text-sm text-muted">Loading…</p>
             )}
             <ul className="absolute bottom-3 left-4 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted">
-              {Object.entries(KINDS).map(([kind, value]) => (
-                <li key={kind} className="flex items-center gap-1.5">
-                  <span className={`h-2 w-2 rounded-full ${value.dot}`} /> {value.label}
+              {Object.entries(KINDS).map(([k, v]) => (
+                <li key={k} className="flex items-center gap-1.5">
+                  <span className={`h-2 w-2 rounded-full ${v.dot}`} /> {v.label}
                 </li>
               ))}
             </ul>
           </div>
         </section>
 
+        {/* NEW: add and remove the skills you list on your profile (your own profile only) */}
+        {isMe && (
+          <section>
+            <Label>my skills</Label>
+            {user.expertise_tags.length === 0 && (
+              <p className="mb-3 text-sm text-muted">You haven't listed any skills yet. Add some below.</p>
+            )}
+            <ul className="mb-3 flex flex-wrap gap-2">
+              {user.expertise_tags.map((sk) => (
+                <li key={sk} className="flex items-center gap-1.5 rounded-full border border-edge bg-tile py-1 pr-1.5 pl-3 text-sm">
+                  {sk}
+                  <button
+                    onClick={() => saveSkills(user.expertise_tags.filter((t) => t !== sk))}
+                    disabled={skillsSaving}
+                    aria-label={`Remove ${sk}`}
+                    title={`Remove ${sk}`}
+                    className="grid h-5 w-5 place-items-center rounded-full text-muted hover:bg-warn/20 hover:text-warn disabled:opacity-50"
+                  >
+                    <X size={13} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <select
+              id="add-skill"
+              value=""
+              disabled={skillsSaving || addableGroups.length === 0}
+              onChange={(e) => e.target.value && saveSkills([...user.expertise_tags, e.target.value])}
+              className="rounded-lg border border-edge bg-tile px-3 py-2 text-sm focus:border-accent focus:outline-none disabled:opacity-50"
+            >
+              <option value="">
+                {vocabulary.isLoading ? 'Loading skills…' : addableGroups.length === 0 ? 'You have every skill' : '+ Add a skill'}
+              </option>
+              {addableGroups.map((g) => (
+                <optgroup key={g.cat} label={g.cat}>
+                  {g.skills.map((sk) => (
+                    <option key={sk} value={sk}>
+                      {sk}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            {skillsError && <p className="mt-3 rounded-lg bg-warn/10 px-3 py-2 text-sm text-warn">{skillsError}</p>}
+            <p className="mt-3 font-mono text-xs text-muted">
+              Removing a skill only removes the "claimed" entry. Skills backed by shipped code or endorsements stay on your graph.
+            </p>
+          </section>
+        )}
+
+        <section>
+          <div className="flex items-start justify-between gap-3">
+            <Label>experience</Label>
+            {me?.id === user.id && (
+              <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-edge px-3 py-1.5 text-sm hover:border-accent">
+                <Upload size={15} /> {uploading ? 'Reading resume…' : 'Upload resume'}
+                <input id="resume" type="file" accept="application/pdf" hidden disabled={uploading} onChange={(e) => e.target.files?.[0] && uploadResume(e.target.files[0])} />
+              </label>
+            )}
+          </div>
+          {uploadError && <p className="mb-3 text-sm text-warn">{uploadError}</p>}
+          {experience.length === 0 && (
+            <p className="text-sm text-muted">{me?.id === user.id ? 'Upload a PDF resume to fill this in.' : 'No experience added yet.'}</p>
+          )}
+          <ol className="border-l border-edge">
+            {experience.map((x) => (
+              <li key={x.id} className="relative py-2.5 pl-6">
+                <span className="absolute top-3.5 -left-[13px] grid h-6 w-6 place-items-center rounded-full bg-tile text-muted ring-4 ring-base">
+                  {x.kind === 'education' ? <GraduationCap size={13} /> : <Briefcase size={13} />}
+                </span>
+                <p className="font-semibold">
+                  {x.title} <span className="font-normal text-muted">· {x.org}</span>
+                </p>
+                <p className="font-mono text-xs text-muted">{[x.start, x.end].filter(Boolean).join(' → ')}</p>
+                {x.summary && <p className="mt-1 text-sm text-ink/80">{x.summary}</p>}
+              </li>
+            ))}
+          </ol>
+          {experience.length > 0 && <p className="mt-2 font-mono text-xs text-muted">from resume · self-reported</p>}
+        </section>
+
         <section>
           <Label>pinned projects</Label>
           {projects.length === 0 && <p className="text-sm text-muted">No projects yet.</p>}
           <div className="grid gap-3 sm:grid-cols-2">
-            {projects.map(project => (
-              <Link key={project.id} to={`/projects/${project.id}`} className="flex flex-col rounded-xl border border-edge p-4 hover:border-accent">
-                <p className="font-mono font-medium text-accent">{project.title}</p>
-                <p className="mt-1 line-clamp-2 flex-1 text-sm text-muted">{project.description}</p>
-                <p className="mt-3 font-mono text-xs text-muted">{project.tags.join(' / ')}</p>
+            {projects.map((p) => (
+              <Link key={p.id} to={`/projects/${p.id}`} className="flex flex-col rounded-xl border border-edge p-4 hover:border-accent">
+                <p className="font-mono font-medium text-accent">{p.title}</p>
+                <p className="mt-1 line-clamp-2 flex-1 text-sm text-muted">{p.description}</p>
+                <p className="mt-3 font-mono text-xs text-muted">{p.tags.join(' · ')}</p>
               </Link>
             ))}
           </div>
-        </section>
-
-        <section aria-label="Latest post">
-          <Label>latest post</Label>
-          {recentPosts.isPending && <p role="status" className="text-sm text-muted">Loading latest post...</p>}
-          {recentPosts.isError && <p role="alert" className="text-sm text-muted">Unable to load the latest post. <button onClick={() => void recentPosts.refetch()} className="text-accent hover:underline">Try again</button></p>}
-          {recentPosts.data?.length === 0 && <p className="text-sm text-muted">No posts yet.</p>}
-          {recentPosts.data?.slice(0, 1).map(({ post, log, project }) => <article key={post.id} className="rounded-xl border border-edge bg-card px-4 py-3">
-            <div className="mb-1 flex flex-wrap items-center justify-between gap-2 text-xs text-muted"><span>{log ? 'Weekly log' : 'Post'}</span><time dateTime={post.created_at}>{new Date(/Z$|[+-]\d\d:\d\d$/.test(post.created_at) ? post.created_at : post.created_at + 'Z').toLocaleDateString()}</time></div>
-            <p className="line-clamp-2 whitespace-pre-wrap break-words text-sm text-ink/85">{log?.title ?? post.body}</p>
-            {project && <Link to={`/projects/${project.id}`} className="mt-2 inline-block max-w-full truncate text-xs text-accent hover:underline">{project.title}</Link>}
-          </article>)}
         </section>
 
         <section>
@@ -274,12 +372,12 @@ export default function Profile() {
           <Label>evidence log</Label>
           {evidence.length === 0 && <p className="text-sm text-muted">No evidence yet.</p>}
           <ol className="border-l border-edge">
-            {evidence.map((entry, index) => (
-              <li key={index} className="relative py-2 pl-6 text-sm">
-                <span className={`absolute top-3.5 -left-[5px] h-2.5 w-2.5 rounded-full ring-4 ring-base ${KINDS[entry.kind].dot}`} />
-                <span className="font-mono text-xs text-muted">{KINDS[entry.kind].label}</span>{' '}
-                <span className="font-semibold">{entry.skill}</span>
-                <p className="text-ink/80">{entry.label}</p>
+            {evidence.map((e, i) => (
+              <li key={i} className="relative py-2 pl-6 text-sm">
+                <span className={`absolute top-3.5 -left-[5px] h-2.5 w-2.5 rounded-full ring-4 ring-base ${KINDS[e.kind].dot}`} />
+                <span className="font-mono text-xs text-muted">{KINDS[e.kind].label}</span>{' '}
+                <span className="font-semibold">{e.skill}</span>
+                <p className="text-ink/80">{e.label}</p>
               </li>
             ))}
           </ol>

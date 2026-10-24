@@ -15,7 +15,7 @@ from itertools import combinations
 
 from sqlmodel import Session, select
 
-from ..models import Endorsement, HelpRequest, LogEntry, Project, ProjectMember, User
+from ..models import Endorsement, Experience, HelpRequest, LogEntry, Project, ProjectMember, User
 
 # Fixed vocabulary so AI drafts, tags and endorsements all land on the same nodes.
 SKILLS = [
@@ -128,6 +128,15 @@ def skill_graph(session: Session, user: User) -> dict:
         if (n := normalize(s)):
             bump(n, "claimed")
             evidence[n].append({"kind": "claimed", "label": "Listed on profile"})
+
+    # Resume entries: self-reported, so they stay "claimed"; each job also links its skills
+    for x in session.exec(select(Experience).where(Experience.user_id == user.id)):
+        skills_here = {n for s in x.skills or [] if (n := normalize(s))}
+        for n in skills_here:
+            bump(n, "claimed")
+            score[n] += 0.5
+            evidence[n].append({"kind": "claimed", "label": f"Resume: {x.title} at {x.org}"})
+        project_skills.append(skills_here)
 
     # Code evidence: skills in published logs the user wrote, and tags on their projects
     member_ids = session.exec(select(ProjectMember.project_id).where(ProjectMember.user_id == user.id)).all()
