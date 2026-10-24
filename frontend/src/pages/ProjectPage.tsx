@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Github, Sparkles } from 'lucide-react'
+import NewProject from './NewProject'
 import Avatar from '../components/Avatar'
 import { LogBody } from './Feed'
 import { ApiError, api, post } from '../lib/api'
@@ -37,10 +38,11 @@ function weekOf(p: Project) {
 
 const lines = (s: string) => s.split('\n').map((l) => l.trim()).filter(Boolean)
 
-function LogEditor({ project, onDone }: { project: Project; onDone: () => void }) {
+function LogEditor({ project, log, onDone }: { project: Project; log?: LogEntry; onDone: () => void }) {
   const blank: Draft = { week_label: `Week of ${day(new Date().toISOString().slice(0, 10))}`, title: '', built: [], learned: [], stuck: [], skills: [], source: 'manual' }
-  const [draft, setDraft] = useState<Draft>(blank)
+  const [draft, setDraft] = useState<Draft>(log ?? blank)
   const [status, setStatus] = useState('')
+  const [saving, setSaving] = useState(false)
 
   async function generate() {
     setStatus('Reading your commits…')
@@ -53,8 +55,14 @@ function LogEditor({ project, onDone }: { project: Project; onDone: () => void }
   }
 
   async function publish() {
-    await post(`/projects/${project.id}/logs`, draft)
-    onDone()
+    setSaving(true); setStatus('')
+    try {
+      const body = { ...draft, built: lines(draft.built.join('\n')), learned: lines(draft.learned.join('\n')), stuck: lines(draft.stuck.join('\n')) }
+      if (log) await api(`/projects/${project.id}/logs/${log.id}`, { method: 'PUT', body: JSON.stringify(body) })
+      else await post(`/projects/${project.id}/logs`, body)
+      onDone()
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save this log.') }
+    finally { setSaving(false) }
   }
 
   const field = 'w-full rounded-lg bg-tile px-3 py-2 text-sm placeholder:text-muted focus:ring-1 focus:ring-accent focus:outline-none'
@@ -74,21 +82,23 @@ function LogEditor({ project, onDone }: { project: Project; onDone: () => void }
     <div className="flex flex-col gap-3 rounded-2xl border border-accent/40 bg-card p-5">
       <div className="flex items-center justify-between gap-3">
         <p className="font-semibold">This week’s log</p>
-        {project.repo_full_name && (
+        {!log && project.repo_full_name && (
           <button onClick={generate} className="flex items-center gap-1.5 rounded-lg bg-accent-soft px-3 py-1.5 text-sm font-medium text-accent">
             <Sparkles size={15} /> Draft from commits
           </button>
         )}
       </div>
       {status && <p className="text-sm text-muted">{status}</p>}
-      <input id="log-title" placeholder="Headline for the week" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} className={field} />
+      <label className="text-xs text-muted">Week label<input aria-label="Week label" value={draft.week_label} onChange={event => setDraft({ ...draft, week_label: event.target.value })} className={field} /></label>
+      <input aria-label="Log title" id="log-title" placeholder="Headline for the week" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} className={field} />
       {list('built', 'What you built, one per line')}
       {list('learned', 'What you learned, one per line')}
       {list('stuck', 'Where you’re stuck, one per line (mentors can help)')}
+      <label className="text-xs text-muted">Skills (comma separated)<input value={draft.skills.join(',')} onChange={event => setDraft({ ...draft, skills: event.target.value.split(',') })} onBlur={() => setDraft({ ...draft, skills: draft.skills.map(skill => skill.trim()).filter(Boolean) })} className={field} /></label>
       <div className="flex justify-end gap-2">
-        <button onClick={onDone} className="rounded-lg px-4 py-2 text-sm text-muted hover:text-ink">Cancel</button>
-        <button onClick={publish} disabled={!draft.title.trim()} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">
-          Publish to timeline
+        <button disabled={saving} onClick={onDone} className="rounded-lg px-4 py-2 text-sm text-muted hover:text-ink">Cancel</button>
+        <button onClick={publish} disabled={saving || !draft.title.trim() || !draft.week_label.trim()} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">
+          {saving ? 'Saving...' : log ? 'Save changes' : 'Publish to timeline'}
         </button>
       </div>
     </div>
@@ -98,16 +108,48 @@ function LogEditor({ project, onDone }: { project: Project; onDone: () => void }
 export default function ProjectPage() {
   const id = Number(useParams().id)
   const qc = useQueryClient()
+  const navigate = useNavigate()
+  const [editing, setEditing] = useState(false)
+  const [action, setAction] = useState<'delete' | 'leave' | null>(null)
+  const [actionError, setActionError] = useState('')
+  const [busy, setBusy] = useState(false)
   const { data: me } = useMe()
   const [writing, setWriting] = useState(false)
+  const [editingLog, setEditingLog] = useState<number | null>(null)
+  const [deletingLog, setDeletingLog] = useState<number | null>(null)
+  const [logError, setLogError] = useState('')
+  const [deleting, setDeleting] = useState(false)
   const [comment, setComment] = useState('')
   const q = useQuery({ queryKey: ['project', id], queryFn: () => api<ProjectData>(`/projects/${id}`) })
   const refresh = () => qc.invalidateQueries({ queryKey: ['project', id] })
 
   if (!q.data) return <p className="text-muted">{q.isError ? 'Project not found.' : 'Loading…'}</p>
   const { project: p, members, timeline, help_requests, comments } = q.data
-  const isMember = members.some((m) => m.user.id === me?.id)
+  const isMember = p.owner_id === me?.id || members.some((m) => m.user.id === me?.id)
+  const isGroup = new Set([p.owner_id, ...members.map(m => m.user.id)]).size > 1
   const week = weekOf(p)
+
+  async function confirmAction() {
+    if (!action) return
+    setBusy(true); setActionError('')
+    try {
+      if (action === 'leave') await post(`/projects/${p.id}/leave`)
+      else await api(`/projects/${p.id}`, { method: 'DELETE' })
+      await qc.invalidateQueries()
+      navigate(action === 'delete' ? '/explore' : `/u/${me!.id}`)
+    } catch (error) { setActionError(error instanceof Error ? error.message : 'Unable to complete this action.') }
+    finally { setBusy(false) }
+  }
+
+  async function removeLog(logId: number) {
+    setDeleting(true); setLogError('')
+    try {
+      await api(`/projects/${p.id}/logs/${logId}`, { method: 'DELETE' })
+      setDeletingLog(null)
+      await qc.invalidateQueries()
+    } catch (error) { setLogError(error instanceof Error ? error.message : 'Could not delete this log.') }
+    finally { setDeleting(false) }
+  }
 
   async function sendComment() {
     if (!comment.trim()) return
@@ -118,6 +160,9 @@ export default function ProjectPage() {
 
   return (
     <div className="flex flex-col gap-8">
+      {isMember && <div className="flex flex-wrap gap-3"><button onClick={() => setEditing(true)} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white">Edit project</button><button onClick={() => { setAction(isGroup ? 'leave' : 'delete'); setActionError('') }} className="rounded-lg border border-edge px-4 py-2 text-sm">{isGroup ? 'Leave project' : 'Delete project'}</button></div>}
+      {editing && isMember && <NewProject key={p.id} project={p} onDone={() => { setEditing(false); void refresh() }} />}
+      {action && isMember && <section aria-label="Confirm project action" className="rounded-xl border border-edge bg-card p-5"><h2 className="font-semibold">{action === 'leave' ? 'Leave this project?' : 'Delete this project?'}</h2><p className="mt-2 text-sm text-muted">{action === 'leave' ? (p.owner_id === me?.id ? 'Your teammates will keep the project. Ownership will pass to a remaining participant.' : 'Your teammates will keep the project. You will lose editing access.') : 'This permanently removes the project and its logs, feedback, and related activity.'}</p>{actionError && <p role="alert" className="mt-3 text-sm text-warn">{actionError}</p>}<div className="mt-4 flex gap-3"><button disabled={busy} onClick={() => void confirmAction()} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{busy ? 'Working...' : action === 'leave' ? 'Confirm leave' : 'Confirm delete'}</button><button disabled={busy} onClick={() => setAction(null)} className="px-4 py-2 text-sm">Cancel</button></div></section>}
       <header className="rounded-2xl border border-edge bg-card p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
@@ -179,13 +224,16 @@ export default function ProjectPage() {
               </button>
             )}
           </div>
-          {writing && <LogEditor project={p} onDone={() => { setWriting(false); refresh() }} />}
+          {writing && isMember && <LogEditor project={p} onDone={() => { setWriting(false); refresh() }} />}
           {timeline.length === 0 && !writing && <p className="text-sm text-muted">No logs yet.</p>}
           <ol className="mt-2 border-l border-edge">
             {timeline.map((log) => (
               <li key={log.id} className="relative pb-6 pl-6">
                 <span className="absolute top-5 -left-[5px] h-2.5 w-2.5 rounded-full bg-accent ring-4 ring-base" />
-                <LogBody log={log} canAsk={log.author_id === me?.id} />
+                <LogBody log={log} canAsk={isMember && log.author_id === me?.id} />
+                {isMember && log.author_id === me?.id && <div className="mt-3 flex gap-3"><button onClick={() => { setEditingLog(log.id); setDeletingLog(null) }} className="text-sm text-accent">Edit log</button><button onClick={() => { setDeletingLog(log.id); setEditingLog(null); setLogError('') }} className="text-sm text-muted">Delete log</button></div>}
+                {isMember && log.author_id === me?.id && editingLog === log.id && <LogEditor key={log.id} project={p} log={log} onDone={() => { setEditingLog(null); void qc.invalidateQueries() }} />}
+                {isMember && log.author_id === me?.id && deletingLog === log.id && <div className="mt-3 rounded-xl border border-edge p-4"><p className="text-sm">Delete this weekly log? Its feed post and comments will also be removed.</p>{logError && <p role="alert" className="mt-2 text-sm text-warn">{logError}</p>}<div className="mt-3 flex gap-3"><button disabled={deleting} onClick={() => void removeLog(log.id)} className="text-sm text-accent">{deleting ? 'Deleting...' : 'Confirm delete'}</button><button disabled={deleting} onClick={() => setDeletingLog(null)} className="text-sm text-muted">Cancel</button></div></div>}
               </li>
             ))}
           </ol>

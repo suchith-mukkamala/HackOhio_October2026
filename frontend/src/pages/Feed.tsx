@@ -143,6 +143,8 @@ function PostCard({ item, meId, onChange }: { item: FeedItem; meId?: number; onC
 
       {log ? <LogBody log={log} canAsk={log.author_id === meId} /> : <p className="mt-3 text-[15px] whitespace-pre-wrap">{p.body}</p>}
 
+      {log && log.author_id === meId && <Link to={`/projects/${log.project_id}`} className="mt-3 inline-block text-sm text-accent hover:underline">Manage weekly log in project</Link>}
+
       <footer className="mt-4 border-t border-edge pt-3">
         {comments.map((c) => (
           <p key={c.id} className="mb-2 rounded-lg bg-tile px-3 py-2 text-sm text-ink/85">

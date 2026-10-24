@@ -8,6 +8,7 @@ from ..auth import current_user
 from ..db import get_session
 from ..models import (
     Comment,
+    Endorsement,
     HelpRequest,
     Invite,
     LogEntry,
@@ -50,7 +51,8 @@ def get_project(session: Session, project_id: int) -> Project:
     return project
 
 def require_member(session: Session, project_id: int, user: User) -> None:
-    if not session.get(ProjectMember, (project_id, user.id)):
+    project = get_project(session, project_id)
+    if project.owner_id != user.id and not session.get(ProjectMember, (project_id, user.id)):
         raise HTTPException(403, "Join this project first")
 
 
@@ -99,6 +101,73 @@ def project_detail(project_id: int, session: Session = Depends(get_session)):
         "help_requests": help_requests,
         "comments": comments,
     }
+
+
+@router.put("/{project_id}", response_model=Project)
+def update_project(project_id: int, body: ProjectIn, user: User = Depends(current_user), session: Session = Depends(get_session)):
+    project = get_project(session, project_id)
+    require_member(session, project_id, user)
+    if not body.title.strip():
+        raise HTTPException(422, "Project title is required")
+    for key, value in body.model_dump().items():
+        setattr(project, key, value)
+    session.add(project)
+    session.commit()
+    session.refresh(project)
+    return project
+
+
+def project_participants(session: Session, project: Project) -> set[int]:
+    return {project.owner_id} | set(session.exec(select(ProjectMember.user_id).where(ProjectMember.project_id == project.id)).all())
+
+
+@router.post("/{project_id}/leave", status_code=204)
+def leave_project(project_id: int, user: User = Depends(current_user), session: Session = Depends(get_session)):
+    project = get_project(session, project_id)
+    require_member(session, project_id, user)
+    remaining = project_participants(session, project) - {user.id}
+    if not remaining:
+        raise HTTPException(409, "You are the only participant. Delete this project instead.")
+    if project.owner_id == user.id:
+        project.owner_id = min(remaining)
+        successor = session.get(ProjectMember, (project_id, project.owner_id))
+        successor.role = "owner"
+        session.add(successor)
+        session.add(project)
+    member = session.get(ProjectMember, (project_id, user.id))
+    if member:
+        session.delete(member)
+    session.commit()
+
+
+@router.delete("/{project_id}", status_code=204)
+def delete_project(project_id: int, user: User = Depends(current_user), session: Session = Depends(get_session)):
+    project = get_project(session, project_id)
+    require_member(session, project_id, user)
+    if project.owner_id != user.id:
+        raise HTTPException(403, "Only the owner can delete a project")
+    if len(project_participants(session, project)) > 1:
+        raise HTTPException(409, "This is a group project. Leave it instead of deleting it.")
+    logs = session.exec(select(LogEntry).where(LogEntry.project_id == project_id)).all()
+    posts = session.exec(select(Post).where((Post.project_id == project_id) | Post.log_entry_id.in_([row.id for row in logs]))).all()
+    requests = session.exec(select(HelpRequest).where(HelpRequest.project_id == project_id)).all()
+    for row in session.exec(select(Comment).where((Comment.project_id == project_id) | Comment.post_id.in_([row.id for row in posts]))).all():
+        session.delete(row)
+    for row in session.exec(select(Endorsement).where((Endorsement.project_id == project_id) | Endorsement.help_request_id.in_([row.id for row in requests]))).all():
+        session.delete(row)
+    session.flush()
+    for row in posts + requests:
+        session.delete(row)
+    session.flush()
+    for row in logs:
+        session.delete(row)
+    for model in (Invite, ProjectMember):
+        for row in session.exec(select(model).where(model.project_id == project_id)).all():
+            session.delete(row)
+    session.flush()
+    session.delete(project)
+    session.commit()
+
 
 
 @router.post("/{project_id}/invite", response_model=Invite)
@@ -172,6 +241,7 @@ def publish_log(
 ):
     """Save the (edited) draft to the timeline and share it to the feed."""
     get_project(session, project_id)
+    require_member(session, project_id, user)
     entry = LogEntry(project_id=project_id, author_id=user.id, **body.model_dump())
     session.add(entry)
     session.commit()
@@ -187,3 +257,44 @@ def list_logs(project_id: int, session: Session = Depends(get_session)):
     return session.exec(
         select(LogEntry).where(LogEntry.project_id == project_id).order_by(LogEntry.created_at.desc())
     ).all()
+
+
+def editable_log(session: Session, project_id: int, log_id: int, user: User) -> LogEntry:
+    require_member(session, project_id, user)
+    entry = session.get(LogEntry, log_id)
+    if not entry or entry.project_id != project_id:
+        raise HTTPException(404, "Weekly log not found")
+    if entry.author_id != user.id:
+        raise HTTPException(403, "Only the author can edit or delete this weekly log")
+    return entry
+
+
+@router.put("/{project_id}/logs/{log_id}", response_model=LogEntry)
+def update_log(project_id: int, log_id: int, body: LogIn, user: User = Depends(current_user), session: Session = Depends(get_session)):
+    entry = editable_log(session, project_id, log_id, user)
+    if not body.title.strip() or not body.week_label.strip():
+        raise HTTPException(422, "A title and week label are required")
+    # Authorship, project, creation date and commit provenance remain unchanged.
+    for key in ("week_label", "title", "built", "learned", "stuck", "skills"):
+        setattr(entry, key, getattr(body, key))
+    session.add(entry)
+    for post in session.exec(select(Post).where(Post.log_entry_id == log_id)).all():
+        post.body = entry.title
+        session.add(post)
+    session.commit()
+    session.refresh(entry)
+    return entry
+
+
+@router.delete("/{project_id}/logs/{log_id}", status_code=204)
+def delete_log(project_id: int, log_id: int, user: User = Depends(current_user), session: Session = Depends(get_session)):
+    entry = editable_log(session, project_id, log_id, user)
+    posts = session.exec(select(Post).where(Post.log_entry_id == log_id)).all()
+    for comment in session.exec(select(Comment).where(Comment.post_id.in_([post.id for post in posts]))).all():
+        session.delete(comment)
+    session.flush()
+    for post in posts:
+        session.delete(post)
+    session.flush()
+    session.delete(entry)
+    session.commit()
