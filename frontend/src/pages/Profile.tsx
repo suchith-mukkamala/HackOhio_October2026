@@ -151,7 +151,6 @@ export default function Profile() {
 
   return (
     <>
-    {isMe && <div className="mb-5 flex justify-end"><button onClick={() => setShowSettings(previous => !previous)} className="rounded-lg border border-edge bg-card px-4 py-2 text-sm font-medium hover:border-accent">{showSettings ? 'Close settings' : 'Profile settings'}</button></div>}
     {isMe && showSettings && <ProfileSettings onClose={() => setShowSettings(false)} />}
     <div className="grid items-start gap-8 md:grid-cols-[17rem_1fr]">
       {/* Identity column */}
@@ -206,12 +205,17 @@ export default function Profile() {
           <>
             {user.bio && <p className="whitespace-pre-wrap text-[15px] text-ink/85">{user.bio}</p>}
             {me?.id === user.id && (
+              <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => startEditingBio(user.bio)}
                 className="flex w-fit items-center gap-1.5 rounded-lg border border-edge px-3 py-1.5 text-sm hover:border-accent"
               >
                 <Pencil size={14} /> {user.bio ? 'Edit bio' : 'Add a bio'}
               </button>
+              <button onClick={() => setShowSettings(previous => !previous)} aria-expanded={showSettings} className="rounded-lg border border-edge px-3 py-1.5 text-sm hover:border-accent">
+                {showSettings ? 'Close settings' : 'Profile settings'}
+              </button>
+              </div>
             )}
           </>
         )}
