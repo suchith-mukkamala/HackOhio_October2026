@@ -180,3 +180,10 @@ class Experience(SQLModel, table=True):
     end: str = ""  # "" or "Present" when ongoing
     summary: str = ""
     skills: list[str] = json_list()  # from the skill vocabulary; feeds the skill graph
+
+
+class ProfileSettingsRecord(SQLModel, table=True):
+    user_id: int = Field(foreign_key="user.id", primary_key=True)
+    data: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    google_sub: Optional[str] = Field(default=None, unique=True, index=True)
+    google_email: Optional[str] = None

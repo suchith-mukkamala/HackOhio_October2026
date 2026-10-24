@@ -12,7 +12,8 @@ from sqlmodel import Session, select
 from ..auth import COOKIE, optional_user, set_session_cookie
 from ..config import settings
 from ..db import get_session
-from ..models import PublicUser, User
+from ..models import ProfileSettingsRecord, PublicUser, User
+from ..services.profile_settings import settings_record
 from ..schemas import UserLogin, UserRegister
 from ..services import github
 
@@ -242,22 +243,42 @@ def google_callback(
         raise HTTPException(400, "Your Google email isn't verified.")
 
     email = info["email"].lower()
-    user = session.exec(select(User).where(User.email == email)).first()
-
-    if user and user.password_hash and not (current and current.id == user.id):
-        # Someone could have registered a password account with this email without proving
-        # they own it. Don't hand that account to whoever holds the Google address.
-        raise HTTPException(409, "An account with this email already exists. Sign in with your password.")
-
-    if not user:
-        user = User(name=info.get("name") or email, email=email, avatar_url=info.get("picture"))
+    subject = info.get('sub')
+    if not subject:
+        raise HTTPException(502, 'Google did not return an account identifier')
+    linked = session.exec(select(ProfileSettingsRecord).where(ProfileSettingsRecord.google_sub == subject)).first()
+    email_user = session.exec(select(User).where(User.email == email)).first()
+    if current:
+        if linked and linked.user_id != current.id:
+            raise HTTPException(409, 'That Google account is already linked to another user')
+        if email_user and email_user.id != current.id:
+            raise HTTPException(409, 'That email belongs to another account')
+        user = current
+    elif linked:
+        user = session.get(User, linked.user_id)
+    elif email_user:
+        old_record = settings_record(session, email_user.id)
+        if email_user.password_hash or old_record.google_email:
+            raise HTTPException(409, 'Sign in with your existing account, then connect Google in settings')
+        user = email_user
+    else:
+        user = User(name=info.get('name') or email, email=email, avatar_url=info.get('picture'))
         session.add(user)
         try:
-            session.commit()
+            session.flush()
         except IntegrityError:
             session.rollback()
-            raise HTTPException(409, "Could not create your account. Try again.")
-        session.refresh(user)
+            raise HTTPException(409, 'Could not create your account. Try again.')
+    record = settings_record(session, user.id)
+    record.google_sub = subject
+    record.google_email = email
+    session.add_all([user, record])
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(409, 'That Google account is already linked')
+    session.refresh(user)
 
     resp = RedirectResponse(f"{settings.frontend_url}/feed")
     set_session_cookie(resp, user.id)
@@ -268,9 +289,10 @@ def google_callback(
 # ---- Demo ------------------------------------------------------------------
 
 
-def _is_demo_persona(user: User) -> bool:
+def _is_demo_persona(user: User, session: Session | None = None) -> bool:
     """Seeded personas only: no password and no GitHub token. Real accounts can't be demo-logged-into."""
-    return not user.password_hash and not user.github_token
+    google_linked = session is not None and bool(settings_record(session, user.id).google_sub)
+    return not user.password_hash and not user.github_token and not google_linked
 
 
 @router.get("/demo/personas", response_model=list[PublicUser])
@@ -278,7 +300,7 @@ def demo_personas(session: Session = Depends(get_session)):
     if not settings.demo_mode:
         return []
     users = session.exec(select(User).order_by(User.role, User.name)).all()
-    return [u for u in users if _is_demo_persona(u)]
+    return [u for u in users if _is_demo_persona(u, session)]
 
 
 @router.post("/demo/{user_id}", status_code=204)
@@ -288,7 +310,7 @@ def demo_login(user_id: int, response: Response, session: Session = Depends(get_
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(404, "No such persona")
-    if not _is_demo_persona(user):
+    if not _is_demo_persona(user, session):
         raise HTTPException(403, "That account is not a demo persona")
     set_session_cookie(response, user_id)
 

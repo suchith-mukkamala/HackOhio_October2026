@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import Field, field_validator
 from sqlmodel import Session, SQLModel, select
 
-from ..auth import current_user
+from ..auth import current_user, optional_user
+from ..services.profile_settings import preferences, may_contact, public_user
 from ..db import get_session
 from ..models import Comment, LogEntry, Message, Post, Project, PublicUser, Thread, ThreadMember, User
 
@@ -42,19 +43,24 @@ class ThreadIn(SQLModel):
 
 
 @router.get("/feed")
-def feed(limit: int = 50, session: Session = Depends(get_session)):
+def feed(limit: int = 50, session: Session = Depends(get_session), viewer: User | None = Depends(optional_user)):
     posts = session.exec(select(Post).order_by(Post.created_at.desc()).limit(limit)).all()
-    return post_items(session, posts)
+    return post_items(session, posts, viewer)
 
 
-def post_items(session: Session, posts):
+def post_items(session: Session, posts, viewer: User | None = None):
     out = []
     for p in posts:
         author = session.get(User, p.author_id)
+        if (not viewer or viewer.id != p.author_id) and not preferences(session, p.author_id).show_activity:
+            continue
+        linked_log = session.get(LogEntry, p.log_entry_id) if p.log_entry_id else None
+        if linked_log and not linked_log.published:
+            continue
         out.append(
             {
                 "post": p,
-                "author": PublicUser.model_validate(author) if author else None,
+                "author": public_user(session, author, viewer) if author else None,
                 "project": session.get(Project, p.project_id) if p.project_id else None,
                 "log": session.get(LogEntry, p.log_entry_id) if p.log_entry_id else None,
                 "comments": session.exec(select(Comment).where(Comment.post_id == p.id)).all(),
@@ -64,7 +70,7 @@ def post_items(session: Session, posts):
 
 
 @router.get("/users/{user_id}/posts")
-def recent_user_posts(user_id: int, limit: int = Query(default=5, ge=1, le=20), session: Session = Depends(get_session)):
+def recent_user_posts(user_id: int, limit: int = Query(default=5, ge=1, le=20), session: Session = Depends(get_session), viewer: User | None = Depends(optional_user)):
     if not session.get(User, user_id):
         raise HTTPException(404, "User not found")
     posts = session.exec(
@@ -74,7 +80,14 @@ def recent_user_posts(user_id: int, limit: int = Query(default=5, ge=1, le=20), 
         .order_by(Post.created_at.desc(), Post.id.desc())
         .limit(limit)
     ).all()
-    return post_items(session, posts)
+    prefs = preferences(session, user_id)
+    if prefs.pinned_post_id and (prefs.show_activity or (viewer and viewer.id == user_id)):
+        pinned = session.get(Post, prefs.pinned_post_id)
+        if pinned and pinned.author_id == user_id:
+            items = post_items(session, [pinned], viewer)
+            if items:
+                return (items + post_items(session, [p for p in posts if p.id != pinned.id], viewer))[:limit]
+    return post_items(session, posts, viewer)
 
 
 @router.post("/posts", response_model=Post)
@@ -120,7 +133,7 @@ def search(q: str = "", type: str = "students", skill: str = "", session: Sessio
     ]
     if skill:
         hits = [u for u in hits if skill.lower() in (t.lower() for t in u.expertise_tags)]
-    return [PublicUser.model_validate(u) for u in hits]
+    return [public_user(session, u) for u in hits]
 
 
 # ---- DMs (clients poll; no websockets) --------------------------------------
@@ -139,7 +152,7 @@ def my_threads(user: User = Depends(current_user), session: Session = Depends(ge
         last = session.exec(
             select(Message).where(Message.thread_id == tid).order_by(Message.created_at.desc(), Message.id.desc())
         ).first()
-        out.append({"id": tid, "with": [PublicUser.model_validate(o) for o in others], "last": last})
+        out.append({"id": tid, "with": [public_user(session, o, user) for o in others], "last": last})
     return sorted(out, key=lambda t: t["last"].id if t["last"] else 0, reverse=True)
 
 
@@ -160,6 +173,9 @@ def start_thread(body: Optional[ThreadIn] = None, user_id: Optional[int] = None,
         existing = set(session.exec(select(ThreadMember.user_id).where(ThreadMember.thread_id == tid)).all())
         if existing == members:
             return {"id": tid}
+    for recipient in recipients:
+        if not may_contact(session, user.id, recipient, len(members) > 2):
+            raise HTTPException(403, "A recipient's messaging preferences do not allow this conversation")
     thread = Thread()
     session.add(thread)
     session.flush()

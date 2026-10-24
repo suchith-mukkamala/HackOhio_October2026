@@ -105,3 +105,40 @@ export interface SkillVocabulary {
   categories: string[]
   skills: { skill: string; parent: string | null }[]
 }
+export interface ProfilePreferences {
+  availability: 'not_looking' | 'teammates' | 'projects' | 'mentorship' | 'available_to_mentor'
+  preferred_roles: string[]
+  interests: string[]
+  hours_per_week: number
+  website: string
+  linkedin: string
+  contact_email: string
+  show_experience: boolean
+  show_activity: boolean
+  show_contact: boolean
+  direct_messages: 'everyone' | 'teammates' | 'nobody'
+  group_invites: 'everyone' | 'teammates' | 'nobody'
+  particles: boolean
+  reduce_motion: boolean
+  highlighted_skills: string[]
+  pinned_project_ids: number[]
+  pinned_post_id: number | null
+}
+export interface ExperienceEntry {
+  id: number
+  kind: 'work' | 'education'
+  title: string
+  org: string
+  start: string
+  end: string
+  summary: string
+  skills: string[]
+}
+export interface SettingsData {
+  user: User
+  preferences: ProfilePreferences
+  account: { username: string | null; email: string | null; has_password: boolean; github_connected: boolean; google_connected: boolean; google_email: string | null; github_available: boolean; google_available: boolean }
+  projects: Project[]
+  posts: FeedItem['post'][]
+  experience: ExperienceEntry[]
+}

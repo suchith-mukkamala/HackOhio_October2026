@@ -19,6 +19,7 @@ from ..models import (
     User,
 )
 from ..services import ai, github
+from ..services.profile_settings import public_user
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -85,7 +86,7 @@ def project_detail(project_id: int, session: Session = Depends(get_session)):
     project = get_project(session, project_id)
     member_rows = session.exec(select(ProjectMember).where(ProjectMember.project_id == project_id)).all()
     members = [
-        {"role": m.role, "user": PublicUser.model_validate(session.get(User, m.user_id))} for m in member_rows
+        {"role": m.role, "user": public_user(session, session.get(User, m.user_id))} for m in member_rows
     ]
     timeline = session.exec(
         select(LogEntry)

@@ -4,7 +4,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlmodel import Field, Session, SQLModel, select  # CHANGED: added Field
 
-from ..auth import current_user
+from ..auth import current_user, optional_user
+from ..services.profile_settings import preferences, public_preferences, public_user
 from ..db import get_session
 from ..models import Endorsement, Experience, Project, ProjectMember, PublicUser, User
 from ..services import ai, github
@@ -64,7 +65,7 @@ def update_me(body: MeUpdate, user: User = Depends(current_user), session: Sessi
 
 
 @router.get("/users/{user_id}")
-def profile(user_id: int, session: Session = Depends(get_session)):
+def profile(user_id: int, session: Session = Depends(get_session), viewer: User | None = Depends(optional_user)):
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(404, "User not found")
@@ -74,11 +75,14 @@ def profile(user_id: int, session: Session = Depends(get_session)):
     ).all()
     endorsements = session.exec(select(Endorsement).where(Endorsement.to_id == user_id)).all()
     experience = session.exec(select(Experience).where(Experience.user_id == user_id).order_by(Experience.id)).all()
+    own = viewer is not None and viewer.id == user_id
+    prefs = preferences(session, user_id)
     return {
-        "user": PublicUser.model_validate(user),
+        "preferences": public_preferences(session, user_id, own),
+        "user": public_user(session, user, viewer),
         "projects": projects,
         "endorsements": endorsements,
-        "experience": experience,
+        "experience": experience if own or prefs.show_experience else [],
     }
 
 
@@ -107,11 +111,17 @@ def upload_resume(file: UploadFile, user: User = Depends(current_user), session:
 
 
 @router.get("/users/{user_id}/skills")
-def skills(user_id: int, session: Session = Depends(get_session)):
+def skills(user_id: int, session: Session = Depends(get_session), viewer: User | None = Depends(optional_user)):
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(404, "User not found")
-    return skill_graph(session, user)
+    graph = skill_graph(session, user)
+    if (not viewer or viewer.id != user_id) and not preferences(session, user_id).show_experience:
+        for node in graph['nodes']:
+            for evidence in node['evidence']:
+                if evidence['label'].startswith('Resume:'):
+                    evidence['label'] = 'Listed skill'
+    return graph
 
 
 @router.get("/skills/vocabulary")

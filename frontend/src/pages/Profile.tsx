@@ -3,12 +3,14 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Briefcase, Github, GraduationCap, MessageSquare, Pencil, Upload, X } from 'lucide-react' // CHANGED: added X
 import Avatar from '../components/Avatar'
+import ProfileSettings from '../components/ProfileSettings'
 import SkillGraphView from '../components/SkillGraphView'
 import { ApiError, api, put } from '../lib/api'
 import { headline, useMe } from '../lib/auth'
-import type { FeedItem, MeUpdate, Project, SkillGraph, SkillVocabulary, User } from '../lib/types' // CHANGED: added MeUpdate, SkillVocabulary
+import type { FeedItem, MeUpdate, ProfilePreferences, Project, SettingsData, SkillGraph, SkillVocabulary, User } from '../lib/types' // CHANGED: added MeUpdate, SkillVocabulary
 
 interface ProfileData {
+  preferences?: ProfilePreferences
   user: User
   projects: Project[]
   endorsements: { id: number }[]
@@ -49,6 +51,8 @@ export default function Profile() {
   const profile = useQuery({ queryKey: ['user', id], queryFn: () => api<ProfileData>(`/users/${id}`) })
   const graph = useQuery({ queryKey: ['skills', id], queryFn: () => api<SkillGraph>(`/users/${id}/skills`) })
   const qc = useQueryClient()
+  const [showSettings, setShowSettings] = useState(false)
+  const ownSettings = useQuery({ queryKey: ['profile-settings'], queryFn: () => api<SettingsData>('/me/settings'), enabled: Boolean(me) })
   const recentPosts = useQuery({ queryKey: ['user-posts', id, 1], queryFn: () => api<FeedItem[]>(`/users/${id}/posts?limit=1`) })
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
@@ -113,14 +117,21 @@ export default function Profile() {
     setUploadError('')
     const body = new FormData()
     body.append('file', file)
-    const res = await fetch('/api/me/resume', { method: 'POST', body, credentials: 'include' })
-    if (!res.ok) setUploadError((await res.json().catch(() => ({}))).detail ?? 'Upload failed.')
-    await qc.invalidateQueries({ queryKey: ['user', id] })
-    setUploading(false)
+    try {
+      const res = await fetch('/api/me/resume', { method: 'POST', body, credentials: 'include' })
+      if (!res.ok) setUploadError((await res.json().catch(() => ({}))).detail ?? 'Upload failed.')
+      else await qc.invalidateQueries()
+    } catch {
+      setUploadError('Upload failed. Please try again.')
+    } finally {
+      setUploading(false)
+    }
   }
 
   if (!profile.data) return <p className="text-muted">{profile.isError ? 'Profile not found.' : 'Loading…'}</p>
-  const { user, projects, endorsements, experience } = profile.data
+  const { user, projects: allProjects, endorsements, experience, preferences } = profile.data
+  const projects = preferences?.pinned_project_ids?.length ? preferences.pinned_project_ids.flatMap(id => allProjects.filter(project => project.id === id)) : allProjects
+  const availabilityLabels: Record<string, string> = { teammates: 'Looking for teammates', projects: 'Open to projects', mentorship: 'Looking for a mentor', available_to_mentor: 'Available to mentor' }
   const skills = (graph.data?.nodes ?? []).filter((n) => n.tier in KINDS)
   const evidence = skills.flatMap((n) => n.evidence.map((e) => ({ ...e, skill: n.skill })))
   const handle = user.github_username ?? user.name.toLowerCase().replace(/[^a-z]+/g, '-')
@@ -139,6 +150,9 @@ export default function Profile() {
     .filter((g) => g.skills.length > 0)
 
   return (
+    <>
+    {isMe && <div className="mb-5 flex justify-end"><button onClick={() => setShowSettings(previous => !previous)} className="rounded-lg border border-edge bg-card px-4 py-2 text-sm font-medium hover:border-accent">{showSettings ? 'Close settings' : 'Profile settings'}</button></div>}
+    {isMe && showSettings && <ProfileSettings onClose={() => setShowSettings(false)} />}
     <div className="grid items-start gap-8 md:grid-cols-[17rem_1fr]">
       {/* Identity column */}
       <aside className="flex flex-col gap-4 md:sticky md:top-20">
@@ -201,6 +215,11 @@ export default function Profile() {
             )}
           </>
         )}
+        {preferences?.availability && availabilityLabels[preferences.availability] && <span className="w-fit rounded-full bg-accent-soft px-3 py-1.5 text-xs font-medium text-accent">{availabilityLabels[preferences.availability]}</span>}
+        {Boolean(preferences?.hours_per_week) && <p className="text-sm text-muted">{preferences!.hours_per_week} hours available per week</p>}
+        {Boolean(preferences?.preferred_roles?.length) && <p className="text-sm text-muted">Roles: {preferences!.preferred_roles.join(', ')}</p>}
+        {Boolean(preferences?.interests?.length) && <p className="text-sm text-muted">Interests: {preferences!.interests.join(', ')}</p>}
+        {(preferences?.show_contact || isMe) && <div className="flex flex-wrap gap-3 text-sm text-accent">{preferences?.website && <a href={preferences.website} target="_blank" rel="noreferrer" className="hover:underline">Website</a>}{preferences?.linkedin && <a href={preferences.linkedin} target="_blank" rel="noreferrer" className="hover:underline">LinkedIn</a>}{preferences?.contact_email && <a href={`mailto:${preferences.contact_email}`} className="hover:underline">Contact</a>}</div>}
         {me && me.id !== user.id && (
           <Link to={`/messages?to=${user.id}`} className="flex items-center justify-center gap-2 rounded-lg border border-edge bg-tile py-2 text-sm font-medium hover:border-accent">
             <MessageSquare size={16} /> Message
@@ -233,7 +252,7 @@ export default function Profile() {
             className="relative overflow-hidden rounded-2xl border border-edge bg-card bg-[radial-gradient(var(--color-edge)_1px,transparent_1px)] bg-[size:20px_20px] p-4 pb-12"
           >
             {graph.data ? (
-              <SkillGraphView graph={graph.data} name={user.name} />
+              <SkillGraphView graph={graph.data} name={user.name} particles={ownSettings.data?.preferences.particles} reduceMotion={ownSettings.data?.preferences.reduce_motion} highlightedSkills={preferences?.highlighted_skills} />
             ) : (
               <p className="py-24 text-center font-mono text-sm text-muted">Loading…</p>
             )}
@@ -312,8 +331,8 @@ export default function Profile() {
           </div>
         </section>
 
-        <section aria-label="Latest post">
-          <Label>latest post</Label>
+        <section aria-label={preferences?.pinned_post_id ? 'Featured post' : 'Latest post'}>
+          <Label>{preferences?.pinned_post_id ? 'featured post' : 'latest post'}</Label>
           {recentPosts.isPending && <p role="status" className="text-sm text-muted">Loading latest post...</p>}
           {recentPosts.isError && <p role="alert" className="text-sm text-muted">Unable to load the latest post. <button onClick={() => void recentPosts.refetch()} className="text-accent hover:underline">Try again</button></p>}
           {recentPosts.data?.length === 0 && <p className="text-sm text-muted">No posts yet.</p>}
@@ -366,5 +385,6 @@ export default function Profile() {
         </section>
       </div>
     </div>
+    </>
   )
 }

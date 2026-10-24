@@ -24,15 +24,15 @@
   stroke-width: 1.5;
 }
 .sg-co {
-  stroke: var(--sg-code);
-  stroke-opacity: 0.35;
-  stroke-dasharray: 4 5;
+  stroke: #60a5fa;
+  stroke-opacity: 0.07;
+  stroke-width: 1;
   fill: none;
 }
 
 /* center */
 .sg-center circle {
-  fill: none;
+  fill: var(--color-card, #1a2332);
   stroke: currentColor;
   stroke-opacity: 0.5;
   stroke-width: 2;
@@ -71,10 +71,12 @@
 .sg-mentor .sg-dot,
 .sg-mentor .sg-halo { fill: var(--sg-mentor); }
 
-/* branches (categories and derived parents) are outlined, not filled */
+/* Opaque backgrounds keep paths and particles behind each node. */
+.sg-node-background { fill: var(--color-card, #1a2332); }
+/* Branches keep their outline and an opaque interior. */
 .sg-category .sg-dot,
 .sg-derived .sg-dot {
-  fill: none;
+  fill: var(--color-card, #1a2332);
   stroke: var(--sg-branch);
   stroke-width: 2.5;
 }
@@ -138,3 +140,19 @@
 
 /* Edges keep the same visual weight while gestures spread node positions. */
 .sg-tree, .sg-co { vector-effect: non-scaling-stroke; }
+
+.sg-pathway, .sg-flow { pointer-events: none; }
+.sg-flow { opacity: 0; }
+.sg-flow-blue { fill: #60a5fa; }
+.sg-flow-yellow { fill: #fff4b0; filter: drop-shadow(0 0 3px #ffd34d) drop-shadow(0 0 7px #ffb923); }
+.sg-flow-yellow .sg-flow-glow { fill: #ffd34d; opacity: 0.4; }
+.sg-flow-glow { opacity: 0.2; }
+@media (prefers-reduced-motion: reduce) {
+  .sg-flow { display: none; }
+}
+
+.sg-no-particles .sg-flow, .sg-reduce-motion .sg-flow { display: none; }
+.sg-reduce-motion .sg-pulse .sg-dot, .sg-reduce-motion .sg-pulse .sg-halo { animation: none; }
+.sg-reduce-motion .sg-pulse .sg-halo { opacity: 0.2; }
+.sg-highlighted .sg-dot { stroke: #f3ce73; stroke-width: 2.5; }
+.sg-highlighted .sg-label { font-weight: 600; }

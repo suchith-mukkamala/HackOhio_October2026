@@ -81,12 +81,24 @@ function layout(nodes: SkillNode[], isOpen: (skill: string) => boolean): Layout 
   return { ...spaceGraph(placed, C), treeLinks }
 }
 
+function FlowParticle({ path, color, duration, delay, scale }: { path: string; color: 'blue' | 'yellow'; duration: number; delay: number; scale: number }) {
+  return <g className={`sg-flow sg-flow-${color}`} aria-hidden="true">
+    <circle r={5 / scale} className="sg-flow-glow" />
+    <circle r={2 / scale} />
+    <animateMotion path={path} dur={`${duration}s`} begin={`-${delay}s`} repeatCount="indefinite" calcMode="paced" />
+    <animate attributeName="opacity" values={color === 'yellow' ? '0;0.9;0.9;0' : '0;0.22;0.22;0'} keyTimes="0;0.12;0.88;1" dur={`${duration}s`} begin={`-${delay}s`} repeatCount="indefinite" />
+  </g>
+}
+
 interface Props {
   graph: SkillGraph
   name?: string // shown in the center
+  particles?: boolean
+  reduceMotion?: boolean
+  highlightedSkills?: string[]
 }
 
-export default function SkillGraphView({ graph, name }: Props) {
+export default function SkillGraphView({ graph, name, particles = true, reduceMotion = false, highlightedSkills = [] }: Props) {
   // Start every branch expanded so no skill is hidden on first view.
   const [flipped, setFlipped] = useState<Set<string>>(new Set())
   const { ref: gestureRef, camera } = useGraphGestures(graph.nodes.length > 0)
@@ -131,7 +143,7 @@ export default function SkillGraphView({ graph, name }: Props) {
   }
 
   return (
-    <div className="skillgraph">
+    <div className={`skillgraph ${!particles ? 'sg-no-particles' : ''} ${reduceMotion ? 'sg-reduce-motion' : ''}`}>
       <svg
         ref={gestureRef}
         viewBox={`${viewX - camera.x * displayWidth / camera.scale} ${viewY - camera.y * displayHeight / camera.scale} ${displayWidth / camera.scale} ${displayHeight / camera.scale}`}
@@ -148,22 +160,30 @@ export default function SkillGraphView({ graph, name }: Props) {
           return <line key={`t-${child}`} className="sg-tree" x1={bx} y1={by} x2={a.x} y2={a.y} />
         })}
 
-        {/* skills used together on a project */}
-        {graph.edges.map((e) => {
-          const a = pos.get(e.a)
-          const b = pos.get(e.b)
+        {/* Subtle pathways between skills used together, with sparse blue flow. */}
+        {graph.edges.map((edge, index) => {
+          const a = pos.get(edge.a), b = pos.get(edge.b)
           if (!a || !b) return null
-          return (
-            <line
-              key={`e-${e.a}-${e.b}`}
-              className="sg-co"
-              x1={a.x}
-              y1={a.y}
-              x2={b.x}
-              y2={b.y}
-              strokeWidth={1 + Math.min(e.weight, 4)}
-            />
-          )
+          const path = `M ${a.x} ${a.y} L ${b.x} ${b.y}`
+          return <g key={`e-${edge.a}-${edge.b}`} className="sg-pathway" aria-hidden="true">
+            <path d={path} className="sg-co" />
+            {index % Math.max(1, Math.ceil(graph.edges.length / 60)) === 0 && <FlowParticle path={path} color="blue" duration={26 + index % 9} delay={(index * 7.31) % 29} scale={camera.scale} />}
+          </g>
+        })}
+
+        {/* Each yellow particle follows a full route from the user to a leaf. */}
+        {placed.filter(point => !treeLinks.some(([, parent]) => parent === point.node.skill)).map((leaf, index) => {
+          const route = [leaf]
+          const visited = new Set([leaf.node.skill])
+          let parent = leaf.node.parent
+          while (parent && pos.has(parent) && !visited.has(parent)) {
+            visited.add(parent)
+            const point = pos.get(parent)!
+            route.unshift(point)
+            parent = point.node.parent
+          }
+          const path = `M ${C} ${C} ${route.map(point => `L ${point.x} ${point.y}`).join(' ')}`
+          return <FlowParticle key={`flow-${leaf.node.skill}`} path={path} color="yellow" duration={30 + index % 11} delay={(index * 9.17) % 37} scale={camera.scale} />
         })}
 
         <g className="sg-center" transform={fixedSizeAt(C, C)}>
@@ -181,6 +201,7 @@ export default function SkillGraphView({ graph, name }: Props) {
             `sg-${node.tier}`,
             pulsing ? 'sg-pulse' : '',
             selected === node.skill ? 'sg-selected' : '',
+            highlightedSkills.includes(node.skill) ? 'sg-highlighted' : '',
           ]
             .filter(Boolean)
             .join(' ')
@@ -205,6 +226,7 @@ export default function SkillGraphView({ graph, name }: Props) {
               onClick={() => onNodeClick(node.skill)}
               onKeyDown={onKey}
             >
+              <circle className="sg-node-background" cx={x} cy={y} r={r + 1} />
               <circle className="sg-halo" cx={x} cy={y} r={r * 1.3} />
               {hasHidden && <circle className="sg-more" cx={x} cy={y} r={r + 6} />}
               <circle className="sg-dot" cx={x} cy={y} r={r} />
