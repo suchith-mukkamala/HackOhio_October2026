@@ -166,3 +166,16 @@ class Message(SQLModel, table=True):
     sender_id: int = Field(foreign_key="user.id")
     body: str
     created_at: datetime = Field(default_factory=now)
+
+
+class Experience(SQLModel, table=True):
+    """A job or school from the user's uploaded resume (self-reported)."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    kind: str = "work"  # work | education
+    title: str  # role, or degree for education
+    org: str
+    start: str = ""  # as written on the resume, e.g. "May 2025"
+    end: str = ""  # "" or "Present" when ongoing
+    summary: str = ""

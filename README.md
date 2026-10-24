@@ -27,7 +27,7 @@ This is the one flow we polish end to end. Each step maps to a rung of the chall
 
 1. **Sign in with GitHub.** The profile fills itself from your repos, so it's useful before anyone else joins. *(Look around)*
 2. **Push a project.** Pick a repo, add a description, tags, and the roles you're looking for. *(Join a project)*
-3. **Generate this week's log.** The backend pulls commits since the last log, Claude drafts *what we built / what we learned / where we're stuck*, and the student edits and publishes it to the timeline and feed.
+3. **Generate this week's log.** The backend pulls commits since the last log, OpenAI drafts *what we built / what we learned / where we're stuck*, and the student edits and publishes it to the timeline and feed.
 4. **Ask a mentor.** One click on a "stuck" item creates a help request with a time ask of 5, 15 or 30 minutes. *(Show up)*
 5. **Mentor answers.** Mentors see requests ranked by skill match, answer in minutes, and can endorse the skill they saw.
 6. **The record updates.** The student marks the answer helpful, and that skill turns gold on their graph with the evidence attached. The mentor gets "help given" credit. *(Give back)*
@@ -41,8 +41,8 @@ AI drafts, the student confirms, a mentor verifies. AI never writes the record b
 | Layer | Choice |
 |---|---|
 | Frontend | Vite, React 19, TypeScript, Tailwind CSS v4, React Router, TanStack Query, `react-force-graph-2d` |
-| Backend | Python, FastAPI, SQLModel (SQLite locally, Postgres in production) |
-| AI | Claude via the Anthropic Python SDK, structured output into a `LogDraft` model |
+| Backend | Python, FastAPI, SQLModel on AWS RDS Postgres (no SQLite) |
+| AI | OpenAI (Responses API) with structured output: log drafts from commits, and resume reading |
 | Auth | GitHub OAuth, session in a signed JWT cookie, plus a demo persona picker |
 | Deploy | Frontend on Vercel; backend in Docker on AWS App Runner with RDS Postgres |
 
@@ -65,9 +65,9 @@ AI drafts, the student confirms, a mentor verifies. AI never writes the record b
 │   │   │   └── social.py      # feed, posts, comments, search, DMs
 │   │   └── services/
 │   │       ├── github.py      # GitHub REST calls
-│   │       ├── claude.py      # commit history -> LogDraft
+│   │       ├── ai.py          # OpenAI: commits -> LogDraft, resume PDF -> experience
 │   │       └── skills.py      # skill vocabulary + evidence-weighted graph
-│   ├── seed.py                # resets the DB with demo data
+│   ├── seed_team.py           # adds the four team accounts + sample data (insert-only)
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── .env.example
@@ -103,8 +103,9 @@ Activate it (`source .venv/bin/activate` on macOS/Linux, `.venv\Scripts\activate
 ```bash
 pip install -r requirements.txt
 cp .env.example .env
-python seed.py
 ```
+
+Fill in the `DB_*` fields in `backend/.env` with the AWS RDS endpoint, port, database name, master username and password (ask Rohan or Adi). Everyone shares the one AWS database, and the app won't start without it.
 
 Frontend:
 
@@ -134,20 +135,20 @@ The demo personas work without this. To use real GitHub sign-in:
 
 Create a second OAuth app for production with the deployed callback URL.
 
-### 4. Claude (for auto-docs)
+### 4. OpenAI (log drafts and resume reading)
 
-Add `ANTHROPIC_API_KEY` to `backend/.env`. The model defaults to `claude-opus-5-5`. Set `CLAUDE_MODEL=claude-haiku-5-5` if you want faster, cheaper drafts while iterating. Requests opt into server-side refusal fallbacks, so a declined request is retried on another model automatically.
+Add `OPENAI_API_KEY` to `backend/.env` (create one at platform.openai.com/api-keys). The model defaults to `gpt-4o-mini`; change `OPENAI_MODEL` to use another one.
 
 ### Environment variables
 
 | Variable | What it's for |
 |---|---|
-| `DATABASE_URL` | `sqlite:///./keystone.db` locally, `postgresql+psycopg://...` in production |
+| `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | AWS RDS endpoint, port (5432), database name, master username and password |
 | `JWT_SECRET` | Signs session cookies. Use a long random string. |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` / `GITHUB_REDIRECT_URI` | GitHub OAuth |
 | `FRONTEND_URL` | Where sign-in redirects back to |
-| `ANTHROPIC_API_KEY` / `CLAUDE_MODEL` | Auto-docs drafts |
-| `DEMO_MODE` | `true` shows the persona picker. Keep it on for the video. |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | Log drafts and resume reading |
+| `DEMO_MODE` | Leave `false`. Only real accounts can sign in. |
 | `SECURE_COOKIES` | `true` behind HTTPS in production |
 
 ---
@@ -173,7 +174,7 @@ All routes are prefixed with `/api`. See `/api/docs` for request and response sh
 | Person | Owns |
 |---|---|
 | **Rohan** | Auth, app shell and routing, AWS deploy |
-| **Neel** | Auto-docs (GitHub + Claude), project timeline, feed and posts |
+| **Neel** | Auto-docs (GitHub + OpenAI), project timeline, feed and posts |
 | **Suchith** | Push projects, project page, profile and skill graph |
 | **Adi** | Seed data, help requests and mentor inbox, search, DMs |
 
@@ -183,7 +184,7 @@ Unbuilt pages render a placeholder that names the owner and the endpoints to wir
 
 - Everyone has a personal branch (`Adi`, `Neel`, `Rohan`, `Suchith`). Open a PR into `main` at least every 2 hours. Small merges beat one giant merge at hour 20.
 - If you change a model in `backend/app/models.py`, update `frontend/src/lib/types.ts` in the same PR.
-- Run `python seed.py` after pulling model changes. It drops and recreates every table.
+- The database is shared on AWS. New tables are created automatically on startup, but new columns on existing tables need a migration (see `backend/migrations/`). Never drop tables.
 - **Feature freeze at H17.** After that, only bug fixes and polish.
 - **Upload the video by H22.** Don't wait for the last few minutes.
 
@@ -191,6 +192,6 @@ The full plan (scope decisions, hour-by-hour timeline, demo script and risks) is
 
 ## Deploying
 
-1. **Backend:** build `backend/Dockerfile`, push to ECR, and create an App Runner service on port 8000 with the production env vars (`SECURE_COOKIES=true`, an RDS `DATABASE_URL`).
+1. **Backend:** build `backend/Dockerfile`, push to ECR, and create an App Runner service on port 8000 with the production env vars (`SECURE_COOKIES=true` and the `DB_*` fields).
 2. **Frontend:** import `frontend/` into Vercel and replace `REPLACE-WITH-APP-RUNNER-URL` in `frontend/vercel.json` with the App Runner URL. The rewrite keeps the frontend and API on one origin, so there are no CORS or cookie problems.
 3. **Fallback:** if AWS isn't working by H17, deploy the backend to Render or Railway, or record the demo on localhost. The judges score the video.

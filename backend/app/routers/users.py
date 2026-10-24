@@ -1,12 +1,13 @@
+import base64
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlmodel import Session, SQLModel, select
 
 from ..auth import current_user
 from ..db import get_session
-from ..models import Endorsement, Project, ProjectMember, PublicUser, User
-from ..services import github
+from ..models import Endorsement, Experience, Project, ProjectMember, PublicUser, User
+from ..services import ai, github
 from ..services.skills import skill_graph, skill_vocabulary
 
 router = APIRouter(tags=["users"])
@@ -48,11 +49,30 @@ def profile(user_id: int, session: Session = Depends(get_session)):
         select(Project).where((Project.owner_id == user_id) | (Project.id.in_(member_ids)))
     ).all()
     endorsements = session.exec(select(Endorsement).where(Endorsement.to_id == user_id)).all()
+    experience = session.exec(select(Experience).where(Experience.user_id == user_id).order_by(Experience.id)).all()
     return {
         "user": PublicUser.model_validate(user),
         "projects": projects,
         "endorsements": endorsements,
+        "experience": experience,
     }
+
+
+@router.post("/me/resume")
+def upload_resume(file: UploadFile, user: User = Depends(current_user), session: Session = Depends(get_session)):
+    """Read a PDF resume and replace the user's work and education history with what's in it."""
+    data = file.file.read()
+    if not data.startswith(b"%PDF") or len(data) > 10_000_000:
+        raise HTTPException(400, "Upload a PDF under 10 MB")
+    try:
+        entries = ai.parse_resume(base64.b64encode(data).decode())
+    except RuntimeError as e:
+        raise HTTPException(502, str(e))
+    for old in session.exec(select(Experience).where(Experience.user_id == user.id)):
+        session.delete(old)
+    session.add_all(Experience(user_id=user.id, **e.model_dump()) for e in entries)
+    session.commit()
+    return [e.model_dump() for e in entries]
 
 
 @router.get("/users/{user_id}/skills")
