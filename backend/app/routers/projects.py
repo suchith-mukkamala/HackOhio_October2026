@@ -70,6 +70,7 @@ def create_project(body: ProjectIn, user: User = Depends(current_user), session:
     session.refresh(project)
     session.add(ProjectMember(project_id=project.id, user_id=user.id, role="owner"))
     session.commit()
+    session.refresh(project)  # the second commit expires it; without this the API returns {}
     return project
 
 
@@ -160,6 +161,7 @@ def publish_log(
     session.refresh(entry)
     session.add(Post(author_id=user.id, project_id=project_id, log_entry_id=entry.id, body=entry.title, type="log"))
     session.commit()
+    session.refresh(entry)
     return entry
 
 

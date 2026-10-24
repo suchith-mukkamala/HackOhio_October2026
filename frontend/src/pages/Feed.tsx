@@ -52,7 +52,7 @@ function Composer({ onPosted }: { onPosted: () => void }) {
   )
 }
 
-function LogBody({ log, canAsk }: { log: LogEntry; canAsk: boolean }) {
+export function LogBody({ log, canAsk }: { log: LogEntry; canAsk: boolean }) {
   const [asked, setAsked] = useState<string[]>([])
 
   async function ask(question: string) {
