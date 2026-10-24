@@ -70,7 +70,7 @@ export function OrgsCard() {
       <h2 className="mb-2 font-mono text-xs text-muted">{'// your orgs'}</h2>
       <ul className="flex flex-col gap-2.5">
         {shown.map((c) => (
-          <li key={c.id} title={c.blurb} className="min-w-0">
+          <li key={c.id} title={`${c.name}: ${c.blurb}`} className="min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: c.color }} />
               <span className="truncate text-xs font-medium">{c.name}</span>
