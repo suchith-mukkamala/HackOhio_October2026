@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import Field, field_validator
 from sqlmodel import Session, SQLModel, select
 
@@ -44,6 +44,10 @@ class ThreadIn(SQLModel):
 @router.get("/feed")
 def feed(limit: int = 50, session: Session = Depends(get_session)):
     posts = session.exec(select(Post).order_by(Post.created_at.desc()).limit(limit)).all()
+    return post_items(session, posts)
+
+
+def post_items(session: Session, posts):
     out = []
     for p in posts:
         author = session.get(User, p.author_id)
@@ -57,6 +61,20 @@ def feed(limit: int = 50, session: Session = Depends(get_session)):
             }
         )
     return out
+
+
+@router.get("/users/{user_id}/posts")
+def recent_user_posts(user_id: int, limit: int = Query(default=5, ge=1, le=20), session: Session = Depends(get_session)):
+    if not session.get(User, user_id):
+        raise HTTPException(404, "User not found")
+    posts = session.exec(
+        select(Post)
+        .outerjoin(LogEntry, Post.log_entry_id == LogEntry.id)
+        .where(Post.author_id == user_id, (Post.log_entry_id == None) | (LogEntry.published == True))
+        .order_by(Post.created_at.desc(), Post.id.desc())
+        .limit(limit)
+    ).all()
+    return post_items(session, posts)
 
 
 @router.post("/posts", response_model=Post)

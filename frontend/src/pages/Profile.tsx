@@ -6,7 +6,7 @@ import Avatar from '../components/Avatar'
 import SkillGraphView from '../components/SkillGraphView'
 import { ApiError, api, put } from '../lib/api' // CHANGED: added ApiError, put
 import { headline, useMe } from '../lib/auth'
-import type { MeUpdate, Project, SkillGraph, User } from '../lib/types' // CHANGED: added MeUpdate
+import type { FeedItem, MeUpdate, Project, SkillGraph, User } from '../lib/types' // CHANGED: added MeUpdate
 
 interface ProfileData {
   user: User
@@ -49,6 +49,7 @@ export default function Profile() {
   const profile = useQuery({ queryKey: ['user', id], queryFn: () => api<ProfileData>(`/users/${id}`) })
   const graph = useQuery({ queryKey: ['skills', id], queryFn: () => api<SkillGraph>(`/users/${id}/skills`) })
   const qc = useQueryClient()
+  const recentPosts = useQuery({ queryKey: ['user-posts', id, 1], queryFn: () => api<FeedItem[]>(`/users/${id}/posts?limit=1`) })
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
 
@@ -194,6 +195,7 @@ export default function Profile() {
       </aside>
 
       <div className="flex min-w-0 flex-col gap-8">
+
         {/* Centerpiece: the skill graph */}
         <section>
           <Label>skill graph</Label>
@@ -228,6 +230,18 @@ export default function Profile() {
               </Link>
             ))}
           </div>
+        </section>
+
+        <section aria-label="Latest post">
+          <Label>latest post</Label>
+          {recentPosts.isPending && <p role="status" className="text-sm text-muted">Loading latest post...</p>}
+          {recentPosts.isError && <p role="alert" className="text-sm text-muted">Unable to load the latest post. <button onClick={() => void recentPosts.refetch()} className="text-accent hover:underline">Try again</button></p>}
+          {recentPosts.data?.length === 0 && <p className="text-sm text-muted">No posts yet.</p>}
+          {recentPosts.data?.slice(0, 1).map(({ post, log, project }) => <article key={post.id} className="rounded-xl border border-edge bg-card px-4 py-3">
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-2 text-xs text-muted"><span>{log ? 'Weekly log' : 'Post'}</span><time dateTime={post.created_at}>{new Date(/Z$|[+-]\d\d:\d\d$/.test(post.created_at) ? post.created_at : post.created_at + 'Z').toLocaleDateString()}</time></div>
+            <p className="line-clamp-2 whitespace-pre-wrap break-words text-sm text-ink/85">{log?.title ?? post.body}</p>
+            {project && <Link to={`/projects/${project.id}`} className="mt-2 inline-block max-w-full truncate text-xs text-accent hover:underline">{project.title}</Link>}
+          </article>)}
         </section>
 
         <section>

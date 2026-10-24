@@ -108,7 +108,7 @@ export function LogBody({ log, canAsk }: { log: LogEntry; canAsk: boolean }) {
   )
 }
 
-function PostCard({ item, meId, onChange }: { item: FeedItem; meId?: number; onChange: () => void }) {
+export function PostCard({ item, meId, onChange }: { item: FeedItem; meId?: number; onChange: () => void }) {
   const [comment, setComment] = useState('')
   const { post: p, author, project, log, comments } = item
 
