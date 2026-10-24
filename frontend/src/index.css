@@ -1,13 +1,33 @@
 @import "tailwindcss";
 
+/* Light palette from the Flash sign-in page; dark palette from the Flash dashboard. */
 @theme {
-  --color-scarlet: #ba0c2f;
-  --color-scarlet-dark: #8f0a24;
-  --color-ink: #1d1f24;
-  --color-paper: #f7f6f4;
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-paper: #f8f7f9;
+  --color-navy: #14213d;
+  --color-slate: #5b6478;
+  --color-line: #d9dce3;
+  --color-brand: #3370ef;
+  --color-brand-hover: #2a5fd4;
+  --color-blob: #dfe7fb;
+  --color-blob-2: #e7e3f6;
+
+  --color-base: #0f1521;
+  --color-panel: #161e2b;
+  --color-card: #1a2332;
+  --color-tile: #222c3d;
+  --color-edge: #273246;
+  --color-ink: #e6eaf0;
+  --color-muted: #9aa4b5;
+  --color-accent: #4f8cff;
+  --color-accent-soft: #1f2a40;
+  --color-good: #22c55e;
+  --color-good-soft: #12331f;
+  --color-warn: #f59e0b;
+  --color-avatar: #7c6cf6;
 }
 
 body {
-  @apply bg-paper text-ink antialiased;
+  @apply bg-base font-sans text-ink antialiased;
 }

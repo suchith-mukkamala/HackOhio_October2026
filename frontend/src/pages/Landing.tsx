@@ -1,5 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { Github } from 'lucide-react'
+import Avatar from '../components/Avatar'
 import { api, post } from '../lib/api'
 import type { User } from '../lib/types'
 
@@ -20,37 +22,50 @@ export default function Landing() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-8 px-4 py-12">
-      <div>
-        <h1 className="text-4xl font-bold text-scarlet">Keystone</h1>
-        <p className="mt-3 text-lg">
-          A portfolio AI can't fake. Build in public, get help from mentors in minutes, and earn skills
-          backed by real code and real people.
-        </p>
-      </div>
+    <main className="relative min-h-screen overflow-hidden bg-paper text-navy">
+      {/* Soft background shapes, as on the Flash sign-in page */}
+      <div className="pointer-events-none absolute -top-40 right-[-10%] h-[42rem] w-[42rem] rounded-full bg-blob/70" />
+      <div className="pointer-events-none absolute -bottom-56 right-[-18%] h-[48rem] w-[56rem] rounded-full bg-blob-2/70" />
 
-      <a href="/api/auth/github/login" className="w-fit rounded-md bg-ink px-4 py-2 font-medium text-white">
-        Sign in with GitHub
-      </a>
+      <div className="relative mx-auto flex min-h-screen max-w-6xl items-center px-6 py-16">
+        <div className="w-full max-w-md">
+          <h1 className="text-5xl leading-[1.05] font-semibold tracking-tight">Welcome to Keystone</h1>
+          <p className="mt-4 text-lg text-slate">
+            A portfolio AI can't fake. Build in public, get help from mentors in minutes, and earn skills backed by
+            real code and real people.
+          </p>
 
-      <section>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-black/50">Demo personas</h2>
-        {personas.isError && <p className="mt-2 text-sm text-black/60">Start the backend to load personas.</p>}
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {personas.data?.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => signInAs(p.id)}
-              className="rounded-md border border-black/10 bg-white px-3 py-2 text-left hover:border-scarlet"
-            >
-              <span className="font-medium">{p.name}</span>
-              <span className="block text-xs text-black/60">
-                {p.role} · {p.company ?? p.major}
-              </span>
-            </button>
-          ))}
+          <a
+            href="/api/auth/github/login"
+            className="mt-8 flex h-12 items-center justify-center gap-2 rounded-xl bg-brand font-medium text-white shadow-lg shadow-brand/25 hover:bg-brand-hover"
+          >
+            <Github size={18} /> Sign in with GitHub
+          </a>
+
+          <div className="my-6 flex items-center gap-4 text-sm text-slate">
+            <span className="h-px flex-1 bg-line" /> or try a demo persona <span className="h-px flex-1 bg-line" />
+          </div>
+
+          {personas.isError && <p className="text-sm text-slate">Start the backend to load personas.</p>}
+          <div className="grid gap-2 sm:grid-cols-2">
+            {personas.data?.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => signInAs(p.id)}
+                className="flex items-center gap-3 rounded-xl border border-line bg-white/80 p-3 text-left hover:border-brand"
+              >
+                <Avatar user={p} size={34} />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium">{p.name}</span>
+                  <span className="block truncate text-xs text-slate capitalize">
+                    {p.role} · {p.company ?? p.major}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
-      </section>
+      </div>
     </main>
   )
 }
