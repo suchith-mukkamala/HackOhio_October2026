@@ -88,10 +88,15 @@ export default function Profile() {
     setUploadError('')
     const body = new FormData()
     body.append('file', file)
-    const res = await fetch('/api/me/resume', { method: 'POST', body, credentials: 'include' })
-    if (!res.ok) setUploadError((await res.json().catch(() => ({}))).detail ?? 'Upload failed.')
-    await qc.invalidateQueries({ queryKey: ['user', id] })
-    setUploading(false)
+    try {
+      const res = await fetch('/api/me/resume', { method: 'POST', body, credentials: 'include' })
+      if (!res.ok) setUploadError((await res.json().catch(() => ({}))).detail ?? 'Upload failed.')
+      else await qc.invalidateQueries({ queryKey: ['user', id] })
+    } catch {
+      setUploadError('Upload failed. Please try again.')
+    } finally {
+      setUploading(false)
+    }
   }
 
   if (!profile.data) return <p className="text-muted">{profile.isError ? 'Profile not found.' : 'Loading…'}</p>
@@ -201,4 +206,71 @@ export default function Profile() {
             ) : (
               <p className="py-24 text-center font-mono text-sm text-muted">Loading…</p>
             )}
-            <ul className="absolute bottom-3 left-4 flex flex-wrap gap-x-4 gap-y-1 font-mono
+            <ul className="absolute bottom-3 left-4 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted">
+              {Object.entries(KINDS).map(([kind, value]) => (
+                <li key={kind} className="flex items-center gap-1.5">
+                  <span className={`h-2 w-2 rounded-full ${value.dot}`} /> {value.label}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section>
+          <Label>pinned projects</Label>
+          {projects.length === 0 && <p className="text-sm text-muted">No projects yet.</p>}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {projects.map(project => (
+              <Link key={project.id} to={`/projects/${project.id}`} className="flex flex-col rounded-xl border border-edge p-4 hover:border-accent">
+                <p className="font-mono font-medium text-accent">{project.title}</p>
+                <p className="mt-1 line-clamp-2 flex-1 text-sm text-muted">{project.description}</p>
+                <p className="mt-3 font-mono text-xs text-muted">{project.tags.join(' / ')}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <Label>experience and education</Label>
+          {me?.id === user.id && (
+            <label className="mb-4 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-edge px-4 py-2 text-sm hover:border-accent">
+              <Upload size={16} /> {uploading ? 'Reading resume...' : 'Upload resume (PDF)'}
+              <input type="file" accept="application/pdf,.pdf" disabled={uploading} className="sr-only" onChange={event => {
+                const file = event.target.files?.[0]
+                if (file) void uploadResume(file)
+                event.target.value = ''
+              }} />
+            </label>
+          )}
+          {uploadError && <p role="alert" className="mb-3 text-sm text-warn">{uploadError}</p>}
+          {!experience?.length && <p className="text-sm text-muted">No experience listed yet.</p>}
+          <ul className="space-y-3">
+            {(experience ?? []).map(entry => (
+              <li key={entry.id} className="rounded-xl border border-edge p-4">
+                <h3 className="font-medium">{entry.title}</h3>
+                <p className="mt-1 text-sm text-muted">{entry.org}</p>
+                <p className="mt-1 font-mono text-xs text-muted">{[entry.start, entry.end].filter(Boolean).join(' - ')}</p>
+                {entry.summary && <p className="mt-2 text-sm text-ink/85">{entry.summary}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section>
+          <Label>evidence log</Label>
+          {evidence.length === 0 && <p className="text-sm text-muted">No evidence yet.</p>}
+          <ol className="border-l border-edge">
+            {evidence.map((entry, index) => (
+              <li key={index} className="relative py-2 pl-6 text-sm">
+                <span className={`absolute top-3.5 -left-[5px] h-2.5 w-2.5 rounded-full ring-4 ring-base ${KINDS[entry.kind].dot}`} />
+                <span className="font-mono text-xs text-muted">{KINDS[entry.kind].label}</span>{' '}
+                <span className="font-semibold">{entry.skill}</span>
+                <p className="text-ink/80">{entry.label}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      </div>
+    </div>
+  )
+}
