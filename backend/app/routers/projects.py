@@ -142,6 +142,7 @@ def archive(project_id: int, user: User = Depends(current_user), session: Sessio
 def draft_log(project_id: int, user: User = Depends(current_user), session: Session = Depends(get_session)):
     """Pull commits since the last log and ask Claude for a draft. Nothing is saved."""
     project = get_project(session, project_id)
+    require_member(session, project_id, user)
     if not project.repo_full_name:
         raise HTTPException(400, "Link a GitHub repo to this project first")
     last = session.exec(
