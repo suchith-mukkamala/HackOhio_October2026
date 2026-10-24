@@ -48,6 +48,22 @@ export interface LogEntry {
   created_at: string
 }
 
+export interface Comment {
+  id: number
+  author_id: number
+  body: string
+  created_at: string
+}
+
+// One row of GET /feed
+export interface FeedItem {
+  post: { id: number; body: string; type: 'update' | 'log' | 'question'; created_at: string }
+  author: User | null
+  project: Project | null
+  log: LogEntry | null
+  comments: Comment[]
+}
+
 export interface HelpRequest {
   id: number
   project_id: number
