@@ -49,6 +49,10 @@ def get_project(session: Session, project_id: int) -> Project:
         raise HTTPException(404, "Project not found")
     return project
 
+def require_member(session: Session, project_id: int, user: User) -> None:
+    if not session.get(ProjectMember, (project_id, user.id)):
+        raise HTTPException(403, "Join this project first")
+
 
 @router.get("")
 def list_projects(q: str = "", tag: str = "", status: str = "active", session: Session = Depends(get_session)):
