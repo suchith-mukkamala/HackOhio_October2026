@@ -45,7 +45,11 @@ def register(
         name=data.name,
         email=str(data.email).lower(),
         password_hash=password_hasher.hash(data.password),
-        role="student",
+        role=data.role,
+        major=data.major if data.role == "student" else None,
+        year=data.year if data.role == "student" else None,
+        title=data.title if data.role != "student" else None,
+        company=data.company if data.role != "student" else None,
     )
 
     session.add(user)

@@ -1,0 +1,24 @@
+# Redeploys https://keystone-hackohio.vercel.app on every merge to main.
+# Needs three repo secrets (Settings -> Secrets and variables -> Actions):
+# VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID. See README -> Deploying.
+name: Deploy to Vercel
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # lets you rerun it by hand from the Actions tab
+
+concurrency:
+  group: vercel-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install --global vercel@65.2.0
+      - run: vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}

@@ -197,7 +197,9 @@ The full plan (scope decisions, hour-by-hour timeline, demo script and risks) is
 
 Frontend and backend deploy together as one Vercel project using [Vercel Services](https://vercel.com/docs/services). The root `vercel.json` serves `frontend/` at `/` and runs the FastAPI app in `backend/` at `/api`, so everything is on one domain with no CORS or cookie setup. The database stays on AWS RDS, so every account works the same locally and live.
 
-**Redeploy** from the repo root (Vercel CLI, signed in to the account that owns the project):
+**Every merge to `main` redeploys automatically** through the GitHub Action in `.github/workflows/deploy.yml`. It needs three repo secrets (Settings → Secrets and variables → Actions): `VERCEL_TOKEN` (create one at vercel.com/account/tokens), `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` (from `.vercel/project.json` after `vercel link`). Only the repo owner can add them. Watch runs in the repo's **Actions** tab, or rerun one with **Run workflow**.
+
+To **redeploy by hand** from the repo root (Vercel CLI, signed in to the account that owns the project):
 
 ```bash
 vercel deploy --prod
