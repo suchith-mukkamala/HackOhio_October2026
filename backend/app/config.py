@@ -40,6 +40,8 @@ class Settings:
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
     openai_api_key = os.getenv("OPENAI_API_KEY", "")
     openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "")  # resume reading
+    claude_model = os.getenv("CLAUDE_MODEL", "claude-opus-5-5")
     demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
     # Cookies must be Secure behind HTTPS (App Runner / Vercel) but not on localhost
     secure_cookies = os.getenv("SECURE_COOKIES", "false").lower() == "true"

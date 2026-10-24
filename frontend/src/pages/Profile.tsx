@@ -12,7 +12,7 @@ interface ProfileData {
   user: User
   projects: Project[]
   endorsements: { id: number }[]
-  experience: { id: number; kind: 'work' | 'education'; title: string; org: string; start: string; end: string; summary: string }[]
+  experience: { id: number; kind: 'work' | 'education'; title: string; org: string; start: string; end: string; summary: string; skills: string[] }[]
 }
 
 // Evidence kinds, weakest to strongest (see backend/app/services/skills.py)
@@ -49,15 +49,22 @@ export default function Profile() {
   const qc = useQueryClient()
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  const [uploadNote, setUploadNote] = useState('')
 
   async function uploadResume(file: File) {
     setUploading(true)
     setUploadError('')
+    setUploadNote('')
     const body = new FormData()
     body.append('file', file)
     const res = await fetch('/api/me/resume', { method: 'POST', body, credentials: 'include' })
     if (!res.ok) setUploadError((await res.json().catch(() => ({}))).detail ?? 'Upload failed.')
-    await qc.invalidateQueries({ queryKey: ['user', id] })
+    else {
+      const r: { entries: number; skills: string[]; filled: string[] } = await res.json()
+      setUploadNote(`Added ${r.entries} entries and ${r.skills.length} skills to your graph${r.filled.length ? `, and filled in your ${r.filled.join(' and ')}` : ''}.`)
+    }
+    // The resume can change the graph and empty profile fields, not just the timeline
+    await Promise.all([['user', id], ['skills', id], ['me']].map((queryKey) => qc.invalidateQueries({ queryKey })))
     setUploading(false)
   }
 
@@ -137,6 +144,7 @@ export default function Profile() {
             )}
           </div>
           {uploadError && <p className="mb-3 text-sm text-warn">{uploadError}</p>}
+          {uploadNote && <p className="mb-3 text-sm text-good">{uploadNote}</p>}
           {experience.length === 0 && (
             <p className="text-sm text-muted">{me?.id === user.id ? 'Upload a PDF resume to fill this in.' : 'No experience added yet.'}</p>
           )}
@@ -151,6 +159,11 @@ export default function Profile() {
                 </p>
                 <p className="font-mono text-xs text-muted">{[x.start, x.end].filter(Boolean).join(' → ')}</p>
                 {x.summary && <p className="mt-1 text-sm text-ink/80">{x.summary}</p>}
+                {x.skills?.length > 0 && (
+                  <p className="mt-1.5 flex flex-wrap gap-1.5">
+                    {x.skills.map((s) => <span key={s} className="rounded-full bg-tile px-2 py-0.5 font-mono text-xs text-muted">{s}</span>)}
+                  </p>
+                )}
               </li>
             ))}
           </ol>

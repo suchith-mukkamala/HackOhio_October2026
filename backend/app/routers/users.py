@@ -60,19 +60,26 @@ def profile(user_id: int, session: Session = Depends(get_session)):
 
 @router.post("/me/resume")
 def upload_resume(file: UploadFile, user: User = Depends(current_user), session: Session = Depends(get_session)):
-    """Read a PDF resume and replace the user's work and education history with what's in it."""
+    """Read a PDF resume: replace work/education history (with skills for the graph), fill empty profile fields."""
     data = file.file.read()
     if not data.startswith(b"%PDF") or len(data) > 10_000_000:
         raise HTTPException(400, "Upload a PDF under 10 MB")
     try:
-        entries = ai.parse_resume(base64.b64encode(data).decode())
+        parsed = ai.parse_resume(base64.b64encode(data).decode())
     except RuntimeError as e:
         raise HTTPException(502, str(e))
     for old in session.exec(select(Experience).where(Experience.user_id == user.id)):
         session.delete(old)
-    session.add_all(Experience(user_id=user.id, **e.model_dump()) for e in entries)
+    session.add_all(Experience(user_id=user.id, **e.model_dump()) for e in parsed.entries)
+    filled = []  # never overwrite what the user wrote themselves
+    if parsed.bio and not user.bio:
+        user.bio, filled = parsed.bio, filled + ["bio"]
+    if parsed.major and not user.major and user.role == "student":
+        user.major, filled = parsed.major, filled + ["major"]
+    session.add(user)
     session.commit()
-    return [e.model_dump() for e in entries]
+    skills = sorted({s for e in parsed.entries for s in e.skills})
+    return {"entries": len(parsed.entries), "skills": skills, "filled": filled}
 
 
 @router.get("/users/{user_id}/skills")

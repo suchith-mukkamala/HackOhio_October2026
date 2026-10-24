@@ -1,4 +1,4 @@
-"""Create missing app tables and apply the additive PostgreSQL auth migration."""
+"""Create missing app tables and apply the additive PostgreSQL migrations in migrations/."""
 from pathlib import Path
 
 from sqlalchemy import inspect
@@ -11,7 +11,8 @@ from app.db import engine
 def migrate():
     if engine.dialect.name != "postgresql":
         raise RuntimeError("This migration runner is for PostgreSQL databases only.")
-    sql = (Path(__file__).parent / "migrations" / "001_password_auth.sql").read_text()
+    # Every migration is additive and idempotent, so run them all in order.
+    sql = "\n".join(f.read_text() for f in sorted((Path(__file__).parent / "migrations").glob("*.sql")))
     # Let SQLAlchemy own the transaction, including creation of missing tables.
     sql = sql.replace("BEGIN;", "").replace("COMMIT;", "")
     with engine.begin() as connection:

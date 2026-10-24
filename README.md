@@ -42,7 +42,7 @@ AI drafts, the student confirms, a mentor verifies. AI never writes the record b
 |---|---|
 | Frontend | Vite, React 19, TypeScript, Tailwind CSS v4, React Router, TanStack Query, `react-force-graph-2d` |
 | Backend | Python, FastAPI, SQLModel on AWS RDS Postgres (no SQLite) |
-| AI | OpenAI (Responses API) with structured output: log drafts from commits, and resume reading |
+| AI | Structured output from OpenAI (log drafts from commits) and Claude (resume reading) |
 | Auth | GitHub OAuth, session in a signed JWT cookie, plus a demo persona picker |
 | Deploy | Frontend on Vercel; backend in Docker on AWS App Runner with RDS Postgres |
 
@@ -65,7 +65,7 @@ AI drafts, the student confirms, a mentor verifies. AI never writes the record b
 │   │   │   └── social.py      # feed, posts, comments, search, DMs
 │   │   └── services/
 │   │       ├── github.py      # GitHub REST calls
-│   │       ├── ai.py          # OpenAI: commits -> LogDraft, resume PDF -> experience
+│   │       ├── ai.py          # OpenAI: commits -> LogDraft; Claude: resume PDF -> experience
 │   │       └── skills.py      # skill vocabulary + evidence-weighted graph
 │   ├── seed_team.py           # adds the four team accounts + sample data (insert-only)
 │   ├── requirements.txt
@@ -135,9 +135,9 @@ The demo personas work without this. To use real GitHub sign-in:
 
 Create a second OAuth app for production with the deployed callback URL.
 
-### 4. OpenAI (log drafts and resume reading)
+### 4. AI keys (log drafts and resume reading)
 
-Add `OPENAI_API_KEY` to `backend/.env` (create one at platform.openai.com/api-keys). The model defaults to `gpt-4o-mini`; change `OPENAI_MODEL` to use another one.
+Add `OPENAI_API_KEY` to `backend/.env` for log drafts (platform.openai.com/api-keys; model `OPENAI_MODEL`, default `gpt-4o-mini`), and `ANTHROPIC_API_KEY` for resume reading (console.anthropic.com; model `CLAUDE_MODEL`, default `claude-opus-5-5`).
 
 ### Environment variables
 
@@ -147,7 +147,8 @@ Add `OPENAI_API_KEY` to `backend/.env` (create one at platform.openai.com/api-ke
 | `JWT_SECRET` | Signs session cookies. Use a long random string. |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` / `GITHUB_REDIRECT_URI` | GitHub OAuth |
 | `FRONTEND_URL` | Where sign-in redirects back to |
-| `OPENAI_API_KEY` / `OPENAI_MODEL` | Log drafts and resume reading |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | Log drafts from commits |
+| `ANTHROPIC_API_KEY` / `CLAUDE_MODEL` | Resume reading |
 | `DEMO_MODE` | Leave `false`. Only real accounts can sign in. |
 | `SECURE_COOKIES` | `true` behind HTTPS in production |
 

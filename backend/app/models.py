@@ -179,3 +179,4 @@ class Experience(SQLModel, table=True):
     start: str = ""  # as written on the resume, e.g. "May 2025"
     end: str = ""  # "" or "Present" when ongoing
     summary: str = ""
+    skills: list[str] = json_list()  # from the skill vocabulary; feeds the skill graph

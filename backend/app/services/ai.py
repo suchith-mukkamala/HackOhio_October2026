@@ -1,8 +1,9 @@
-"""AI features, using OpenAI: draft weekly logs from commits, and read resumes.
+"""AI features: OpenAI drafts weekly logs from commits; Claude reads resumes.
 
 The student always edits and confirms a draft before it's published.
 """
 
+from anthropic import Anthropic
 from openai import OpenAI
 from pydantic import BaseModel
 
@@ -25,10 +26,13 @@ class ResumeEntry(BaseModel):
     start: str
     end: str
     summary: str
+    skills: list[str]
 
 
 class ResumeParse(BaseModel):
     entries: list[ResumeEntry]
+    major: str  # field of study for the current or latest degree
+    bio: str  # one-line summary, used only if the profile has no bio
 
 
 LOG_INSTRUCTIONS = f"""You help a university student write an honest weekly progress log for a team project.
@@ -43,10 +47,15 @@ From the commits, changed files and README you're given, return:
 Only describe work the commits show. Don't invent features, and don't oversell."""
 
 RESUME_INSTRUCTIONS = (
-    "Extract every job, internship, research position and school from this resume, newest first. "
+    "Extract every job, internship, research position, project and school from this resume, newest first. "
     'kind is "work" or "education". For education, title is the degree and org is the school. '
     'Copy dates as written; use "Present" for ongoing roles and "" when missing. '
-    "summary is one plain sentence on what they did, taken from the resume. Don't invent anything."
+    "summary is one plain sentence on what they did, taken from the resume. "
+    f"skills are the skills that entry shows, chosen only from this list: {', '.join(SKILLS)}. "
+    "Put skills from a general Skills section on the most recent entry. "
+    'major is the field of study of the current or latest degree ("" if none). '
+    'bio is one short first-person sentence summarizing them, under 140 characters ("" if the resume gives too little). '
+    "Don't invent anything."
 )
 
 
@@ -80,10 +89,27 @@ def draft_log(project_title: str, description: str, commits: list[dict], readme:
     return draft
 
 
-def parse_resume(pdf_b64: str) -> list[ResumeEntry]:
-    """Pull jobs and schools out of a resume PDF, newest first."""
-    content = [
-        {"type": "input_file", "filename": "resume.pdf", "file_data": f"data:application/pdf;base64,{pdf_b64}"},
-        {"type": "input_text", "text": "Extract the work experience and education."},
-    ]
-    return _parse(RESUME_INSTRUCTIONS, content, ResumeParse).entries
+def parse_resume(pdf_b64: str) -> ResumeParse:
+    """Pull jobs and schools out of a resume PDF with Claude, newest first."""
+    if not settings.anthropic_api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY is not set")
+    response = Anthropic(api_key=settings.anthropic_api_key).beta.messages.parse(
+        model=settings.claude_model,
+        max_tokens=8000,
+        # If the model declines, the API reroutes the same request to another model
+        betas=["server-side-fallback-2026-07-01"],
+        fallbacks="default",
+        output_config={"effort": "low"},
+        system=RESUME_INSTRUCTIONS,
+        messages=[{"role": "user", "content": [
+            {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_b64}},
+            {"type": "text", "text": "Extract the work experience and education."},
+        ]}],
+        output_format=ResumeParse,
+    )
+    if response.stop_reason == "refusal" or response.parsed_output is None:
+        raise RuntimeError("Couldn't read this resume")
+    parsed = response.parsed_output
+    for e in parsed.entries:
+        e.skills = [s for s in dict.fromkeys(e.skills) if s in SKILLS]
+    return parsed
