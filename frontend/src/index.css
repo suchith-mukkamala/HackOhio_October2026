@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
-/* Light palette for the sign-in page, dark palette for the app.
-   The four evidence colors at the bottom are the same ones the skill graph uses. */
+/* Light palette for the sign-in page, cool dark palette for the app.
+   The four evidence colors at the bottom get cooler as the evidence gets stronger. */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -15,31 +15,37 @@
   --color-blob: #dfe7fb;
   --color-blob-2: #e7e3f6;
 
-  --color-base: #100c20;
-  --color-panel: #17122c;
-  --color-card: #1e1838;
-  --color-tile: #2a2247;
-  --color-edge: #3a3163;
-  --color-ink: #ece8f7;
-  --color-muted: #a79fc4;
-  --color-accent: #e0457f;
-  --color-accent-soft: #3b1b3a;
-  --color-good: #2fbfa6;
-  --color-good-soft: #10332f;
-  --color-warn: #f2b134;
-  --color-avatar: #8a78f0;
+  --color-base: #0a1124;
+  --color-panel: #101a33;
+  --color-card: #15213f;
+  --color-tile: #1f2d52;
+  --color-edge: #2c3d6b;
+  --color-ink: #e8eefc;
+  --color-muted: #9fb0d6;
+  --color-accent: #4f7cff;
+  --color-accent-soft: #1c2b5e;
+  --color-good: #34d3a4;
+  --color-good-soft: #0f3a33;
+  --color-warn: #f59e0b;
+  --color-avatar: #7c6cf6;
 
-  --color-claimed: #b9a7f5;
-  --color-code: #2fbfa6;
-  --color-peer: #f2b134;
-  --color-mentor: #ee4f8b;
+  --color-claimed: #8f9bc7;
+  --color-code: #2fd4a0;
+  --color-peer: #4aa3ff;
+  --color-mentor: #9b6bff;
 }
 
 body {
   @apply bg-base font-sans text-ink antialiased;
-  /* A soft pink glow in the top-left, and faint orbit rings spreading from the top-right */
+  /* A blue glow top-left, a teal glow bottom-right, and faint orbit rings from the top-right */
   background-image:
-    radial-gradient(60rem 36rem at 8% -8%, rgb(224 69 127 / 0.14), transparent 65%),
-    repeating-radial-gradient(circle at 92% 6%, transparent 0 7rem, rgb(185 167 245 / 0.06) 7rem calc(7rem + 1px));
+    radial-gradient(60rem 36rem at 6% -10%, rgb(79 124 255 / 0.2), transparent 65%),
+    radial-gradient(48rem 30rem at 100% 100%, rgb(47 212 160 / 0.09), transparent 60%),
+    repeating-radial-gradient(circle at 92% 6%, transparent 0 7rem, rgb(143 155 199 / 0.07) 7rem calc(7rem + 1px));
   background-attachment: fixed;
+}
+
+/* Blue-to-violet gradient on every solid accent surface (buttons, the logo tile) */
+.bg-accent {
+  background-image: linear-gradient(135deg, #4f7cff, #7c5cff);
 }
