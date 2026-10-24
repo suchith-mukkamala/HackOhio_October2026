@@ -3,6 +3,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import Field, field_validator
 from sqlmodel import Session, SQLModel, select
 
 from ..auth import current_user
@@ -25,7 +26,16 @@ class CommentIn(SQLModel):
 
 
 class MessageIn(SQLModel):
-    body: str
+    body: str = Field(min_length=1, max_length=10000)
+
+    @field_validator("body", mode="before")
+    @classmethod
+    def trim_body(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+
+class ThreadIn(SQLModel):
+    user_ids: list[int] = Field(min_length=1, max_length=99)
 
 
 # ---- Feed / posts / comments -----------------------------------------------
@@ -109,27 +119,35 @@ def my_threads(user: User = Depends(current_user), session: Session = Depends(ge
             )
         ).all()
         last = session.exec(
-            select(Message).where(Message.thread_id == tid).order_by(Message.created_at.desc())
+            select(Message).where(Message.thread_id == tid).order_by(Message.created_at.desc(), Message.id.desc())
         ).first()
         out.append({"id": tid, "with": [PublicUser.model_validate(o) for o in others], "last": last})
-    return out
+    return sorted(out, key=lambda t: t["last"].id if t["last"] else 0, reverse=True)
 
 
 @router.post("/threads")
-def start_thread(user_id: int, user: User = Depends(current_user), session: Session = Depends(get_session)):
-    """Return the existing 1:1 thread with user_id, or create one."""
-    if not session.get(User, user_id):
-        raise HTTPException(404, "User not found")
-    mine = set(session.exec(select(ThreadMember.thread_id).where(ThreadMember.user_id == user.id)).all())
-    theirs = set(session.exec(select(ThreadMember.thread_id).where(ThreadMember.user_id == user_id)).all())
-    if shared := mine & theirs:
-        return {"id": min(shared)}
+def start_thread(body: Optional[ThreadIn] = None, user_id: Optional[int] = None,
+                 user: User = Depends(current_user), session: Session = Depends(get_session)):
+    """Reuse exact-member conversations without confusing groups with direct threads."""
+    recipients = set(body.user_ids if body else ([user_id] if user_id is not None else []))
+    recipients.discard(user.id)
+    if not recipients:
+        raise HTTPException(400, "Choose at least one other person")
+    for recipient in recipients:
+        if not session.get(User, recipient):
+            raise HTTPException(404, "User not found")
+    members = recipients | {user.id}
+    mine = session.exec(select(ThreadMember.thread_id).where(ThreadMember.user_id == user.id)).all()
+    for tid in mine:
+        existing = set(session.exec(select(ThreadMember.user_id).where(ThreadMember.thread_id == tid)).all())
+        if existing == members:
+            return {"id": tid}
     thread = Thread()
     session.add(thread)
+    session.flush()
+    session.add_all([ThreadMember(thread_id=thread.id, user_id=uid) for uid in members])
     session.commit()
     session.refresh(thread)
-    session.add_all([ThreadMember(thread_id=thread.id, user_id=user.id), ThreadMember(thread_id=thread.id, user_id=user_id)])
-    session.commit()
     return {"id": thread.id}
 
 
@@ -141,7 +159,7 @@ def require_member(session: Session, thread_id: int, user: User) -> None:
 @router.get("/threads/{thread_id}/messages")
 def messages(thread_id: int, user: User = Depends(current_user), session: Session = Depends(get_session)):
     require_member(session, thread_id, user)
-    return session.exec(select(Message).where(Message.thread_id == thread_id).order_by(Message.created_at)).all()
+    return session.exec(select(Message).where(Message.thread_id == thread_id).order_by(Message.created_at, Message.id)).all()
 
 
 @router.post("/threads/{thread_id}/messages", response_model=Message)

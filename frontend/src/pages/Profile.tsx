@@ -82,7 +82,7 @@ export default function Profile() {
         </div>
         {user.bio && <p className="text-[15px] text-ink/85">{user.bio}</p>}
         {me && me.id !== user.id && (
-          <Link to="/messages" className="flex items-center justify-center gap-2 rounded-lg border border-edge bg-tile py-2 text-sm font-medium hover:border-accent">
+          <Link to={`/messages?to=${user.id}`} className="flex items-center justify-center gap-2 rounded-lg border border-edge bg-tile py-2 text-sm font-medium hover:border-accent">
             <MessageSquare size={16} /> Message
           </Link>
         )}
