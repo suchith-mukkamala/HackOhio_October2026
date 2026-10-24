@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Github, Sparkles } from 'lucide-react'
 import NewProject from './NewProject'
@@ -114,7 +114,8 @@ export default function ProjectPage() {
   const [actionError, setActionError] = useState('')
   const [busy, setBusy] = useState(false)
   const { data: me } = useMe()
-  const [writing, setWriting] = useState(false)
+  const [params] = useSearchParams()
+  const [writing, setWriting] = useState(params.get('write') === '1')
   const [editingLog, setEditingLog] = useState<number | null>(null)
   const [deletingLog, setDeletingLog] = useState<number | null>(null)
   const [logError, setLogError] = useState('')

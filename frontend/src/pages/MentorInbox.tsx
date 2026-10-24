@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, api, post } from '../lib/api'
 import type { HelpRequest } from '../lib/types'
 
 // Open help requests, best skill match first. Industry pros and faculty can answer and endorse.
-function RequestCard({ r, onAnswered }: { r: HelpRequest; onAnswered: () => void }) {
+function RequestCard({ r, onAnswered, highlighted = false }: { r: HelpRequest; onAnswered: () => void; highlighted?: boolean }) {
   const [answer, setAnswer] = useState('')
   const [skill, setSkill] = useState('')
   const [error, setError] = useState('')
@@ -20,7 +20,7 @@ function RequestCard({ r, onAnswered }: { r: HelpRequest; onAnswered: () => void
   }
 
   return (
-    <li className="rounded-2xl border border-edge bg-card p-5">
+    <li id={`request-${r.id}`} className={`rounded-2xl border bg-card p-5 ${highlighted ? 'border-accent ring-1 ring-accent/30' : 'border-edge'}`}>
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-muted">
         <span className="rounded-full bg-accent-soft px-2 py-0.5 text-accent">{Math.min(100, Math.round((r.match_score ?? 0) * 100))}% match</span>
         <span>{r.minutes} min ask</span>
@@ -54,15 +54,19 @@ function RequestCard({ r, onAnswered }: { r: HelpRequest; onAnswered: () => void
 
 export default function MentorInbox() {
   const qc = useQueryClient()
+  const [params] = useSearchParams()
+  const requestedId = Number(params.get('request'))
   const inbox = useQuery({ queryKey: ['inbox'], queryFn: () => api<HelpRequest[]>('/help/inbox') })
+
+  const requests = [...(inbox.data ?? [])].sort((a, b) => Number(b.id === requestedId) - Number(a.id === requestedId))
 
   return (
     <section className="flex flex-col gap-3">
       <h2 className="font-mono text-sm text-muted">{'// help requests for you'}</h2>
       {inbox.data?.length === 0 && <p className="text-sm text-muted">No open requests right now.</p>}
       <ul className="flex flex-col gap-3">
-        {inbox.data?.map((r) => (
-          <RequestCard key={r.id} r={r} onAnswered={() => qc.invalidateQueries({ queryKey: ['inbox'] })} />
+        {requests.map((r) => (
+          <RequestCard key={r.id} r={r} highlighted={r.id === requestedId} onAnswered={() => { void qc.invalidateQueries({ queryKey: ['inbox'] }); void qc.invalidateQueries({ queryKey: ['home-sidebar'] }) }} />
         ))}
       </ul>
     </section>

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CircleCheck, CircleHelp, Lightbulb, Send } from 'lucide-react'
+import './Feed.css'
+import HomeSidebar from '../components/HomeSidebar'
 import Avatar from '../components/Avatar'
 import { api, post } from '../lib/api'
 import { headline, useMe } from '../lib/auth'
@@ -29,7 +31,7 @@ function Composer({ onPosted }: { onPosted: () => void }) {
   return (
     <div className="flex gap-3 rounded-2xl border border-edge bg-card p-4">
       <Avatar user={me} />
-      <div className="flex-1">
+      <div className="min-w-0 flex-1">
         <textarea
           id="composer"
           value={body}
@@ -141,7 +143,7 @@ export function PostCard({ item, meId, onChange }: { item: FeedItem; meId?: numb
         )}
       </header>
 
-      {log ? <LogBody log={log} canAsk={log.author_id === meId} /> : <p className="mt-3 text-[15px] whitespace-pre-wrap">{p.body}</p>}
+      {log ? <LogBody log={log} canAsk={log.author_id === meId} /> : <p className="mt-3 text-[15px] whitespace-pre-wrap break-words">{p.body}</p>}
 
       {log && log.author_id === meId && <Link to={`/projects/${log.project_id}`} className="mt-3 inline-block text-sm text-accent hover:underline">Manage weekly log in project</Link>}
 
@@ -158,7 +160,7 @@ export function PostCard({ item, meId, onChange }: { item: FeedItem; meId?: numb
             onChange={(e) => setComment(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && sendComment()}
             placeholder="Give feedback…"
-            className="flex-1 rounded-lg bg-tile px-3 py-2 text-sm placeholder:text-muted focus:ring-1 focus:ring-accent focus:outline-none"
+            className="min-w-0 flex-1 rounded-lg bg-tile px-3 py-2 text-sm placeholder:text-muted focus:ring-1 focus:ring-accent focus:outline-none"
           />
           <button onClick={sendComment} title="Send" className="rounded-lg p-2 text-muted hover:bg-tile hover:text-accent">
             <Send size={16} />
@@ -176,23 +178,24 @@ export default function Feed() {
   const refresh = () => qc.invalidateQueries({ queryKey: ['feed'] })
 
   return (
-    <div className="grid items-start gap-6 md:grid-cols-[15rem_1fr]">
+    <div className={me ? 'home-feed grid w-full min-w-0 items-start gap-4 md:grid-cols-[11rem_minmax(0,1fr)] lg:grid-cols-[11rem_minmax(0,1fr)_15rem] xl:gap-5' : 'mx-auto max-w-2xl'}>
       {me && (
         <Link to={`/u/${me.id}`} className="sticky top-20 hidden overflow-hidden rounded-2xl border border-edge bg-card text-center md:block">
           <div className="h-14 bg-gradient-to-r from-brand via-accent to-avatar" />
           <span className="-mt-8 inline-block rounded-full ring-4 ring-card">
             <Avatar user={me} size={64} />
           </span>
-          <p className="mt-2 px-4 font-semibold">{me.name}</p>
-          <p className="px-4 pb-4 text-sm text-muted">{headline(me)}</p>
+          <p className="mt-2 break-words px-4 font-semibold">{me.name}</p>
+          <p className="break-words px-4 pb-4 text-sm text-muted">{headline(me)}</p>
           <p className="border-t border-edge py-3 text-sm font-medium text-accent">View profile</p>
         </Link>
       )}
-      <div className="flex max-w-2xl flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-4">
         <Composer onPosted={refresh} />
         {feed.data?.length === 0 && <p className="text-muted">Nothing here yet. Post the first update.</p>}
         {feed.data?.map((item) => <PostCard key={item.post.id} item={item} meId={me?.id} onChange={refresh} />)}
       </div>
+      {me && <div className="home-sidebar-shell min-w-0 md:col-start-2 lg:col-start-3 lg:row-start-1 lg:sticky lg:top-20"><HomeSidebar me={me} /></div>}
     </div>
   )
 }

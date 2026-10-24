@@ -1,0 +1,26 @@
+﻿/* Let long names, URLs and role descriptions wrap inside their grid track. */
+.home-feed { overflow-wrap: anywhere; }
+.home-sidebar { width: 100%; min-width: 0; overflow-wrap: anywhere; }
+.home-sidebar svg { flex-shrink: 0; }
+
+@media (min-width: 1024px) {
+  /* The sticky rail stays below the navigation and above the viewport bottom. */
+  .home-sidebar-shell {
+    max-height: calc(100dvh - 6rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-edge) transparent;
+    padding: 2px 4px 4px 2px;
+    scroll-padding: 8px;
+  }
+}
+
+/* Compact previews on laptop-height displays; full lists remain linked. */
+@media (min-width: 1024px) and (max-height: 850px) {
+  .home-sidebar-item:nth-child(n + 3) { display: none; }
+}
+@media (min-width: 1024px) and (max-height: 650px) {
+  .home-sidebar-item:nth-child(n + 2) { display: none; }
+}
