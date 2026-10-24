@@ -31,6 +31,7 @@ class User(SQLModel, table=True):
     password_hash: Optional[str] = None  # GitHub and demo users have no local password.
 
     role: str = "student"  # student | mentor | faculty
+    is_admin: bool = False  # set by redeeming ADMIN_CODE, see routers/admin.py
     name: str
     email: Optional[str] = Field(default=None, unique=True, index=True)
     major: Optional[str] = None
@@ -50,6 +51,7 @@ class PublicUser(SQLModel):
 
     id: int
     role: str
+    is_admin: bool = False
     name: str
     major: Optional[str] = None
     year: Optional[str] = None
