@@ -157,6 +157,11 @@ export function PostCard({ item, meId, onChange }: { item: FeedItem; meId?: numb
             {project.title}
           </Link>
         )}
+        {isAdmin && (
+            <button onClick={removePost} title="Delete post (admin)" className="rounded-lg p-2 text-muted hover:bg-tile hover:text-warn">
+              <Trash2 size={16} />
+            </button>
+          )}
       </header>
 
       {log ? <LogBody log={log} canAsk={log.author_id === meId} /> : <p className="mt-3 text-[15px] whitespace-pre-wrap break-words">{p.body}</p>}
