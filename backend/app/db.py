@@ -34,6 +34,8 @@ def _add_missing_columns() -> None:
         return
     with engine.begin() as connection:
         connection.exec_driver_sql('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE')
+        connection.exec_driver_sql('ALTER TABLE post ADD COLUMN IF NOT EXISTS media_url VARCHAR')
+        connection.exec_driver_sql('ALTER TABLE post ADD COLUMN IF NOT EXISTS media_kind VARCHAR')
 
 
 def _promote_admins() -> None:
