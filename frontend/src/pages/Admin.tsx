@@ -14,24 +14,31 @@ function RedeemCode() {
   const qc = useQueryClient()
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
+  const [unlocking, setUnlocking] = useState(false)
 
   async function redeem(e: FormEvent) {
     e.preventDefault()
+    if (unlocking) return
+    setUnlocking(true)
+    setError('')
     try {
       await post('/admin/redeem', { code })
       setCode('')
       await qc.invalidateQueries({ queryKey: ['me'] })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not check that code.')
+    } finally {
+      setUnlocking(false)
     }
   }
 
   return (
     <form onSubmit={redeem} className="max-w-md rounded-2xl border border-edge bg-card p-5">
       <h1 className="text-lg font-semibold">Admin access</h1>
-      <p className="mt-1 text-sm text-muted">Enter the admin code to unlock the admin tools.</p>
+      <p className="mt-1 text-sm text-muted">Enter the shared admin code to grant admin privileges to your signed-in account.</p>
       <input
         id="admin-code"
+        aria-label="Shared admin code"
         type="password"
         autoComplete="off"
         value={code}
@@ -45,10 +52,10 @@ function RedeemCode() {
       {error && <p className="mt-1 text-sm text-warn">{error}</p>}
       <button
         type="submit"
-        disabled={!code.trim()}
+        disabled={unlocking || !code.trim()}
         className="mt-3 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
       >
-        Unlock
+        {unlocking ? 'Unlocking...' : 'Unlock'}
       </button>
     </form>
   )

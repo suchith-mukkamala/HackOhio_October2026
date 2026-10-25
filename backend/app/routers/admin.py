@@ -39,7 +39,7 @@ def require_admin(user: User = Depends(current_user)) -> User:
 def redeem(body: RedeemBody, user: User = Depends(current_user), session: Session = Depends(get_session)):
     """Type the secret code, become an admin."""
     if not settings.admin_code:
-        raise HTTPException(404, "Admin access is turned off")
+        raise HTTPException(404, "Admin access is not configured. Set ADMIN_CODE in the backend environment.")
     # compare_digest takes the same time however many characters match
     if not secrets.compare_digest(body.code.strip().encode(), settings.admin_code.encode()):
         raise HTTPException(403, "That code is not valid")
