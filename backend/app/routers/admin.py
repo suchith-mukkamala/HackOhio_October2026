@@ -14,6 +14,9 @@ from ..auth import current_user
 from ..config import settings
 from ..db import get_session
 from ..models import PublicUser, User
+from ..models import Project
+from ..services.user_cleanup import cleanup
+from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -26,6 +29,14 @@ class RedeemBody(SQLModel):
 
 class RoleBody(SQLModel):
     role: str
+
+
+class AdminUser(PublicUser):
+    username: str | None = None
+
+
+class DeleteUserBody(SQLModel):
+    confirmation: str
 
 
 def require_admin(user: User = Depends(current_user)) -> User:
@@ -50,7 +61,7 @@ def redeem(body: RedeemBody, user: User = Depends(current_user), session: Sessio
     return user
 
 
-@router.get("/users", response_model=list[PublicUser])
+@router.get("/users", response_model=list[AdminUser])
 def all_users(_: User = Depends(require_admin), session: Session = Depends(get_session)):
     return session.exec(select(User).order_by(User.id)).all()
 
@@ -73,3 +84,36 @@ def set_role(
     session.commit()
     session.refresh(target)
     return target
+
+
+def deletion_target(session: Session, user_id: int, actor: User):
+    if user_id == actor.id:
+        raise HTTPException(403, 'You cannot delete your own admin account')
+    target = session.get(User, user_id)
+    if not target:
+        raise HTTPException(404, 'User not found')
+    return target
+
+
+@router.get('/users/{user_id}/deletion-preview')
+def deletion_preview(user_id: int, actor: User = Depends(require_admin), session: Session = Depends(get_session)):
+    target = deletion_target(session, user_id, actor)
+    projects = session.exec(select(Project).where(Project.owner_id == user_id)).all()
+    return dict(user=AdminUser.model_validate(target), owned_projects=[dict(id=project.id, title=project.title) for project in projects], **cleanup(session, {user_id}, preview=True))
+
+
+@router.delete('/users/{user_id}')
+def delete_user(user_id: int, body: DeleteUserBody, actor: User = Depends(require_admin), session: Session = Depends(get_session)):
+    deletion_target(session, user_id, actor)
+    if body.confirmation.strip() != f'DELETE {user_id}':
+        raise HTTPException(400, f'Type DELETE {user_id} to confirm this account deletion')
+    try:
+        result = cleanup(session, {user_id})
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(409, 'The account could not be removed because related data changed. Refresh the preview and try again.')
+    except Exception:
+        session.rollback()
+        raise
+    return result

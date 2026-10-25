@@ -3,9 +3,11 @@ import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Avatar from '../components/Avatar'
+import DeleteUserDialog from '../components/DeleteUserDialog'
+import type { AdminUser } from '../components/DeleteUserDialog'
 import { ApiError, api, post, put } from '../lib/api'
 import { useMe } from '../lib/auth'
-import type { Role, User } from '../lib/types'
+import type { Role } from '../lib/types'
 
 const ROLES: Role[] = ['student', 'mentor', 'faculty']
 
@@ -65,9 +67,12 @@ function RedeemCode() {
 function UserList({ meId }: { meId: number }) {
   const qc = useQueryClient()
   const [error, setError] = useState('')
-  const { data: users, isLoading } = useQuery({
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState<AdminUser | null>(null)
+  const [notice, setNotice] = useState('')
+  const { data: users, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-users'],
-    queryFn: () => api<User[]>('/admin/users'),
+    queryFn: () => api<AdminUser[]>('/admin/users'),
   })
 
   async function changeRole(id: number, role: Role) {
@@ -84,15 +89,19 @@ function UserList({ meId }: { meId: number }) {
   return (
     <section>
       <h1 className="text-lg font-semibold">Admin</h1>
-      <p className="mt-1 text-sm text-muted">Switch anyone between student, mentor and faculty.</p>
+      <p className="mt-1 text-sm text-muted">Manage roles and remove accounts with their associated data.</p>
+      <input type="search" aria-label="Search users" placeholder="Search name, username, or user ID" value={search} onChange={event => setSearch(event.target.value)} className="mt-4 w-full max-w-md rounded-lg border border-edge bg-tile px-3 py-2 text-sm" />
+      {notice && <p role="status" className="mt-3 text-sm text-good">{notice}</p>}
+      {isError && <p role="alert" className="mt-3 text-sm text-warn">Unable to load users. <button onClick={() => void refetch()} className="text-accent">Retry</button></p>}
       {error && <p className="mt-2 text-sm text-warn">{error}</p>}
       {isLoading && <p className="mt-4 text-muted">Loading users...</p>}
       <ul className="mt-4 divide-y divide-edge rounded-2xl border border-edge bg-card">
-        {(users ?? []).map((u) => (
-          <li key={u.id} className="flex items-center gap-3 px-4 py-3">
+        {(users ?? []).filter(user => `${user.name} ${user.username ?? ''} ${user.id}`.toLowerCase().includes(search.toLowerCase())).map((u) => (
+          <li key={u.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
             <Avatar user={u} size={32} />
             <Link to={`/u/${u.id}`} className="min-w-0 flex-1 truncate text-sm hover:text-accent">
               {u.name}
+              <span className="mt-1 block truncate text-xs text-muted">{u.username ? `@${u.username} · ` : ''}ID {u.id}</span>
               {u.is_admin && (
                 <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 font-mono text-xs text-accent">admin</span>
               )}
@@ -110,9 +119,11 @@ function UserList({ meId }: { meId: number }) {
                 </option>
               ))}
             </select>
+            <button disabled={u.id === meId} onClick={() => { setSelected(u); setNotice('') }} aria-label={`Delete ${u.name}, user ${u.id}`} title={u.id === meId ? 'You cannot delete your own admin account' : 'Preview account deletion'} className="rounded-lg border border-red-500/40 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 disabled:opacity-30">Delete</button>
           </li>
         ))}
       </ul>
+      {selected && <DeleteUserDialog key={selected.id} user={selected} onClose={() => setSelected(null)} onDeleted={() => { setNotice(`Deleted ${selected.name} (user ${selected.id}) and associated data.`); setSelected(null); void qc.invalidateQueries() }} />}
     </section>
   )
 }
