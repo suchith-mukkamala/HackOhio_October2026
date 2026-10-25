@@ -49,16 +49,19 @@ export interface LogEntry {
   created_at: string
 }
 
+export type MediaKind = 'image' | 'video' | 'youtube'
+
 export interface Comment {
   id: number
   author_id: number
+  author_name?: string | null
   body: string
   created_at: string
 }
 
 // One row of GET /feed
 export interface FeedItem {
-  post: { id: number; body: string; type: 'update' | 'log' | 'question'; created_at: string }
+  post: { id: number; author_id: number; body: string; type: 'update' | 'log' | 'question'; created_at: string; media_url?: string | null; media_kind?: MediaKind | null }
   author: User | null
   project: Project | null
   log: LogEntry | null

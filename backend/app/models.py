@@ -115,6 +115,8 @@ class Post(SQLModel, table=True):
     log_entry_id: Optional[int] = Field(default=None, foreign_key="logentry.id")
     body: str
     type: str = "update"  # update | log | question
+    media_url: Optional[str] = None  # an https link, or an uploaded file as a data: URL
+    media_kind: Optional[str] = None  # image | video | youtube
     created_at: datetime = Field(default_factory=now)
 
 

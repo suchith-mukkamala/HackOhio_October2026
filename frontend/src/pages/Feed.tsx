@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { CircleCheck, CircleHelp, Lightbulb, Send } from 'lucide-react'
+import { CircleCheck, CircleHelp, ImagePlus, Lightbulb, Link2, Send, Trash2, X } from 'lucide-react'
 import './Feed.css'
 import HomeSidebar from '../components/HomeSidebar'
 import { Ladder, OrgsCard } from '../components/Community'
 import Avatar from '../components/Avatar'
-import { api, post } from '../lib/api'
+import { ApiError, api, post } from '../lib/api'
 import { headline, useMe } from '../lib/auth'
-import type { FeedItem, LogEntry } from '../lib/types'
+import type { FeedItem, LogEntry, MediaKind } from '../lib/types'
 
 const ago = (iso: string) => {
   const mins = Math.round((Date.now() - new Date(iso.endsWith('Z') ? iso : iso + 'Z').getTime()) / 60000)
@@ -17,16 +17,53 @@ const ago = (iso: string) => {
   return `${Math.round(mins / 1440)}d`
 }
 
+const kindOf = (url: string): MediaKind =>
+  /youtube\.com|youtu\.be/.test(url) ? 'youtube' : /\.(mp4|webm|mov)(\?|$)/i.test(url) ? 'video' : 'image'
+
+const youtubeId = (url: string) => url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/)?.[1]
+
+function Media({ url, kind }: { url: string; kind: MediaKind }) {
+  const box = 'max-h-[28rem] w-full rounded-xl border border-edge bg-tile object-cover'
+  const id = kind === 'youtube' ? youtubeId(url) : undefined
+  if (id) return <iframe src={`https://www.youtube-nocookie.com/embed/${id}`} title="Video" allowFullScreen className="aspect-video w-full rounded-xl border border-edge" />
+  if (kind === 'video') return <video src={url} controls playsInline className={box} />
+  return <img src={url} alt="" loading="lazy" className={box} />
+}
+
 function Composer({ onPosted }: { onPosted: () => void }) {
   const { data: me } = useMe()
   const [body, setBody] = useState('')
+  const [media, setMedia] = useState<{ url: string; kind: MediaKind } | null>(null)
+  const [linking, setLinking] = useState(false)
+  const [error, setError] = useState('')
   if (!me) return null
+
+  function attachFile(file: File) {
+    // Stored with the post; Vercel caps requests at 4.5 MB, so keep files small
+    if (file.size > 3_000_000) return setError('Pick a file under 3 MB, or paste a link instead.')
+    const reader = new FileReader()
+    reader.onload = () => setMedia({ url: reader.result as string, kind: file.type.startsWith('video') ? 'video' : 'image' })
+    reader.readAsDataURL(file)
+    setError('')
+  }
+
+  function attachLink(url: string) {
+    if (!url.startsWith('https://')) return setError('Links must start with https://')
+    setMedia({ url, kind: kindOf(url) })
+    setError('')
+  }
 
   async function submit() {
     if (!body.trim()) return
-    await post('/posts', { body })
-    setBody('')
-    onPosted()
+    try {
+      await post('/posts', { body, media_url: media?.url, media_kind: media?.kind })
+      setBody('')
+      setMedia(null)
+      setLinking(false)
+      onPosted()
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not post.')
+    }
   }
 
   return (
@@ -41,11 +78,36 @@ function Composer({ onPosted }: { onPosted: () => void }) {
           rows={2}
           className="w-full resize-none bg-transparent text-[15px] placeholder:text-muted focus:outline-none"
         />
-        <div className="flex justify-end">
+        {media && (
+          <div className="relative mt-2">
+            <Media url={media.url} kind={media.kind} />
+            <button onClick={() => setMedia(null)} title="Remove" className="absolute top-2 right-2 rounded-full bg-base/80 p-1 text-ink hover:text-warn">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        {linking && !media && (
+          <input
+            id="media-link"
+            autoFocus
+            placeholder="Paste an image, .mp4 or YouTube link, then press Enter"
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.value.trim() && attachLink(e.currentTarget.value.trim())}
+            className="mt-2 w-full rounded-lg bg-tile px-3 py-2 text-sm placeholder:text-muted focus:ring-1 focus:ring-accent focus:outline-none"
+          />
+        )}
+        {error && <p className="mt-2 text-sm text-warn">{error}</p>}
+        <div className="mt-2 flex items-center gap-1">
+          <label title="Add a photo or video" className="cursor-pointer rounded-lg p-2 text-muted hover:bg-tile hover:text-accent">
+            <ImagePlus size={18} />
+            <input id="media-file" type="file" accept="image/*,video/*" hidden onChange={(e) => { if (e.target.files?.[0]) attachFile(e.target.files[0]); e.target.value = '' }} />
+          </label>
+          <button onClick={() => setLinking(!linking)} title="Add an image or video link" className="rounded-lg p-2 text-muted hover:bg-tile hover:text-accent">
+            <Link2 size={18} />
+          </button>
           <button
             onClick={submit}
             disabled={!body.trim()}
-            className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+            className="ml-auto rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
           >
             Post
           </button>
@@ -114,6 +176,14 @@ export function LogBody({ log, canAsk }: { log: LogEntry; canAsk: boolean }) {
 export function PostCard({ item, meId, onChange }: { item: FeedItem; meId?: number; onChange: () => void }) {
   const [comment, setComment] = useState('')
   const { post: p, author, project, log, comments } = item
+  const { data: me } = useMe()
+  const canDelete = (authorId: number) => me?.id === authorId || !!me?.is_admin
+
+  async function remove(path: string, what: string) {
+    if (!window.confirm(`Delete this ${what}?`)) return
+    await api(path, { method: 'DELETE' })
+    onChange()
+  }
 
   async function sendComment() {
     if (!comment.trim()) return
@@ -142,17 +212,32 @@ export function PostCard({ item, meId, onChange }: { item: FeedItem; meId?: numb
             {project.title}
           </Link>
         )}
+        {canDelete(p.author_id) && (
+          <button onClick={() => remove(`/posts/${p.id}`, 'post')} title="Delete post" className="rounded-lg p-2 text-muted hover:bg-tile hover:text-warn">
+            <Trash2 size={16} />
+          </button>
+        )}
       </header>
 
       {log ? <LogBody log={log} canAsk={log.author_id === meId} /> : <p className="mt-3 text-[15px] whitespace-pre-wrap break-words">{p.body}</p>}
+
+      {p.media_url && p.media_kind && <div className="mt-3"><Media url={p.media_url} kind={p.media_kind} /></div>}
 
       {log && log.author_id === meId && <Link to={`/projects/${log.project_id}`} className="mt-3 inline-block text-sm text-accent hover:underline">Manage weekly log in project</Link>}
 
       <footer className="mt-4 border-t border-edge pt-3">
         {comments.map((c) => (
-          <p key={c.id} className="mb-2 rounded-lg bg-tile px-3 py-2 text-sm text-ink/85">
-            {c.body}
-          </p>
+          <div key={c.id} className="mb-2 flex items-start gap-2 rounded-lg bg-tile px-3 py-2 text-sm text-ink/85">
+            <p className="min-w-0 flex-1 break-words">
+              {c.author_name && <span className="mr-1.5 font-semibold text-ink">{c.author_name}</span>}
+              {c.body}
+            </p>
+            {canDelete(c.author_id) && (
+              <button onClick={() => remove(`/comments/${c.id}`, 'comment')} title="Delete comment" className="shrink-0 text-muted hover:text-warn">
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
         ))}
         <div className="flex items-center gap-2">
           <input

@@ -1,6 +1,6 @@
 """Feed, posts, comments, search and DMs."""
 
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import Field, field_validator
@@ -9,7 +9,7 @@ from sqlmodel import Session, SQLModel, select
 from ..auth import current_user, optional_user
 from ..services.profile_settings import preferences, may_contact, public_user
 from ..db import get_session
-from ..models import Comment, LogEntry, Message, Post, Project, PublicUser, Thread, ThreadMember, User
+from ..models import Challenge, Comment, LogEntry, Message, Post, Project, PublicUser, Thread, ThreadMember, User
 
 router = APIRouter(tags=["social"])
 
@@ -18,6 +18,15 @@ class PostIn(SQLModel):
     body: str
     project_id: Optional[int] = None
     type: str = "update"
+    media_url: Optional[str] = Field(default=None, max_length=4_200_000)  # ~3 MB file once base64-encoded
+    media_kind: Optional[Literal["image", "video", "youtube"]] = None
+
+    @field_validator("media_url")
+    @classmethod
+    def safe_media(cls, value):
+        if value and not value.startswith(("https://", "data:image/", "data:video/")):
+            raise ValueError("Media must be an https link or an uploaded image/video")
+        return value
 
 
 class CommentIn(SQLModel):
@@ -63,7 +72,10 @@ def post_items(session: Session, posts, viewer: User | None = None):
                 "author": public_user(session, author, viewer) if author else None,
                 "project": session.get(Project, p.project_id) if p.project_id else None,
                 "log": session.get(LogEntry, p.log_entry_id) if p.log_entry_id else None,
-                "comments": session.exec(select(Comment).where(Comment.post_id == p.id)).all(),
+                "comments": [
+                    {**c.model_dump(), "author_name": (a.name if (a := session.get(User, c.author_id)) else None)}
+                    for c in session.exec(select(Comment).where(Comment.post_id == p.id).order_by(Comment.id))
+                ],
             }
         )
     return out
@@ -108,6 +120,39 @@ def create_comment(body: CommentIn, user: User = Depends(current_user), session:
     session.commit()
     session.refresh(comment)
     return comment
+
+
+def can_delete(user: User, author_id: int) -> bool:
+    return user.id == author_id or bool(user.is_admin)
+
+
+@router.delete("/posts/{post_id}", status_code=204)
+def delete_post(post_id: int, user: User = Depends(current_user), session: Session = Depends(get_session)):
+    """Authors can delete their own posts; admins can delete any. Its comments go with it."""
+    post = session.get(Post, post_id)
+    if not post:
+        raise HTTPException(404, "Post not found")
+    if not can_delete(user, post.author_id):
+        raise HTTPException(403, "You can only delete your own posts")
+    for c in session.exec(select(Comment).where(Comment.post_id == post_id)):
+        session.delete(c)
+    for ch in session.exec(select(Challenge).where(Challenge.post_id == post_id)):
+        ch.post_id = None  # the entry stays in the challenge gallery
+        session.add(ch)
+    session.flush()
+    session.delete(post)
+    session.commit()
+
+
+@router.delete("/comments/{comment_id}", status_code=204)
+def delete_comment(comment_id: int, user: User = Depends(current_user), session: Session = Depends(get_session)):
+    comment = session.get(Comment, comment_id)
+    if not comment:
+        raise HTTPException(404, "Comment not found")
+    if not can_delete(user, comment.author_id):
+        raise HTTPException(403, "You can only delete your own comments")
+    session.delete(comment)
+    session.commit()
 
 
 # ---- Search -----------------------------------------------------------------

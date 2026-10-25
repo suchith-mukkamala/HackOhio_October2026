@@ -9,7 +9,7 @@ import { useMe } from '../lib/auth'
 
 // Icon-only navigation, underlined when active.
 const tabClass = ({ isActive }: { isActive: boolean }) =>
-  `flex h-full w-12 shrink-0 flex-col items-center justify-center gap-0.5 border-b-2 text-[10px] sm:w-16 sm:text-xs lg:w-20 ${
+  `flex h-full min-w-12 shrink-0 flex-col items-center justify-center gap-0.5 border-b-2 px-2 text-[10px] sm:min-w-14 sm:px-3.5 sm:text-xs ${
     isActive ? 'border-ink text-ink' : 'border-transparent text-muted hover:text-ink'
   }`
 
