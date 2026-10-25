@@ -13,9 +13,6 @@ from .models import User
 COOKIE = "session"
 ALGORITHM = "HS256"
 
-if user.is_banned:
-    raise HTTPException(status_code=403, detail="This account has been suspended")
-
 
 def set_session_cookie(response: Response, user_id: int) -> None:
     token = jwt.encode(
@@ -50,8 +47,6 @@ def current_user(request: Request, session: Session = Depends(get_session)) -> U
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(401, "User no longer exists")
-    if user.is_banned:
-        raise HTTPException(403, "This account has been suspended")
     return user
 
 

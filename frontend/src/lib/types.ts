@@ -13,8 +13,6 @@ export interface User {
   avatar_url?: string
   github_username?: string
   is_admin?: boolean
-  username?: string // only in the admin user list
-  is_banned?: boolean // only in the admin user list
   expertise_tags: string[]
 }
 

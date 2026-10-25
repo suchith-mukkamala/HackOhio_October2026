@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { CircleCheck, CircleHelp, Lightbulb, Send, Trash2 } from 'lucide-react'
+import { CircleCheck, CircleHelp, Lightbulb, Send } from 'lucide-react'
 import './Feed.css'
 import HomeSidebar from '../components/HomeSidebar'
 import { Ladder, OrgsCard } from '../components/Community'
 import Avatar from '../components/Avatar'
-import { api, del, post } from '../lib/api'
+import { api, post } from '../lib/api'
 import { headline, useMe } from '../lib/auth'
 import type { FeedItem, LogEntry } from '../lib/types'
 
@@ -115,21 +115,6 @@ export function PostCard({ item, meId, onChange }: { item: FeedItem; meId?: numb
   const [comment, setComment] = useState('')
   const { post: p, author, project, log, comments } = item
 
-    const { data: viewer } = useMe()
-    const isAdmin = !!viewer?.is_admin
-
-    async function removePost() {
-      if (!window.confirm('Delete this post and its comments?')) return
-      await del(`/admin/posts/${p.id}`)
-      onChange()
-    }
-
-    async function removeComment(id: number) {
-      if (!window.confirm('Delete this comment?')) return
-      await del(`/admin/comments/${id}`)
-      onChange()
-    }
-
   async function sendComment() {
     if (!comment.trim()) return
     await post('/comments', { body: comment, post_id: p.id })
@@ -157,11 +142,6 @@ export function PostCard({ item, meId, onChange }: { item: FeedItem; meId?: numb
             {project.title}
           </Link>
         )}
-        {isAdmin && (
-            <button onClick={removePost} title="Delete post (admin)" className="rounded-lg p-2 text-muted hover:bg-tile hover:text-warn">
-              <Trash2 size={16} />
-            </button>
-          )}
       </header>
 
       {log ? <LogBody log={log} canAsk={log.author_id === meId} /> : <p className="mt-3 text-[15px] whitespace-pre-wrap break-words">{p.body}</p>}
@@ -170,7 +150,9 @@ export function PostCard({ item, meId, onChange }: { item: FeedItem; meId?: numb
 
       <footer className="mt-4 border-t border-edge pt-3">
         {comments.map((c) => (
-          <p key={c.id} className="mb-2 rounded-lg bg-tile px-3 py-2 text-sm text-ink/85">{c.body}</p>
+          <p key={c.id} className="mb-2 rounded-lg bg-tile px-3 py-2 text-sm text-ink/85">
+            {c.body}
+          </p>
         ))}
         <div className="flex items-center gap-2">
           <input

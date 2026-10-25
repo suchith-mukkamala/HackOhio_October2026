@@ -25,7 +25,6 @@ def init_db() -> None:
 
 
 def _add_missing_columns() -> None:
-connection.exec_driver_sql('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS is_banned BOOLEAN NOT NULL DEFAULT FALSE')
     """create_all never alters a table that already exists, so new columns on old tables go here.
 
     Every statement must be additive and safe to re-run (IF NOT EXISTS). Postgres only:
