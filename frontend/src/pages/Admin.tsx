@@ -106,12 +106,16 @@ function UserList({ meId }: { meId: number }) {
       {isLoading && <p className="mt-4 text-muted">Loading users...</p>}
       <ul className="mt-4 divide-y divide-edge rounded-2xl border border-edge bg-card">
         {(users ?? []).map((u) => (
-          <li key={u.id} className="flex items-center gap-3 px-4 py-3">
+                    <li key={u.id} className={`flex flex-wrap items-center gap-3 px-4 py-3 ${u.is_banned ? 'opacity-70' : ''}`}>
             <Avatar user={u} size={32} />
             <Link to={`/u/${u.id}`} className="min-w-0 flex-1 truncate text-sm hover:text-accent">
               {u.name}
+              {u.username && <span className="ml-2 font-mono text-xs text-muted">@{u.username}</span>}
               {u.is_admin && (
                 <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 font-mono text-xs text-accent">admin</span>
+              )}
+              {u.is_banned && (
+                <span className="ml-2 rounded-full bg-tile px-2 py-0.5 font-mono text-xs text-warn">banned</span>
               )}
             </Link>
             <select
@@ -127,6 +131,24 @@ function UserList({ meId }: { meId: number }) {
                 </option>
               ))}
             </select>
+            {!u.is_admin &&
+              (u.is_banned ? (
+                <button onClick={() => setBan(u, false)} className="rounded-lg border border-edge px-2 py-2 text-sm hover:border-accent">
+                  Unban
+                </button>
+              ) : (
+                <>
+                  <button onClick={() => setBan(u, true)} className="rounded-lg border border-edge px-2 py-2 text-sm text-warn hover:border-warn">
+                    Ban
+                  </button>
+                  <button
+                    onClick={() => setBan(u, true, true)}
+                    className="rounded-lg border border-edge px-2 py-2 text-sm text-warn hover:border-warn"
+                  >
+                    Ban + delete posts
+                  </button>
+                </>
+              ))}
           </li>
         ))}
       </ul>
