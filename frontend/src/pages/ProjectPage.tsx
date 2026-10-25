@@ -110,6 +110,10 @@ export default function ProjectPage() {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const [editing, setEditing] = useState(false)
+  const [completionAction, setCompletionAction] = useState<'archive' | 'reopen' | null>(null)
+  const [completionError, setCompletionError] = useState('')
+  const [completing, setCompleting] = useState(false)
+  const [shareStatus, setShareStatus] = useState('')
   const [action, setAction] = useState<'delete' | 'leave' | null>(null)
   const [actionError, setActionError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -129,6 +133,23 @@ export default function ProjectPage() {
   const isMember = p.owner_id === me?.id || members.some((m) => m.user.id === me?.id)
   const isGroup = new Set([p.owner_id, ...members.map(m => m.user.id)]).size > 1
   const week = weekOf(p)
+
+  async function changeCompletion() {
+    if (!completionAction) return
+    setCompleting(true); setCompletionError('')
+    try {
+      await post(`/projects/${p.id}/${completionAction}`)
+      setCompletionAction(null); setWriting(false)
+      await qc.invalidateQueries()
+    } catch (error) { setCompletionError(error instanceof Error ? error.message : 'Unable to update this project.') }
+    finally { setCompleting(false) }
+  }
+
+  async function shareProject() {
+    const url = new URL(`/projects/${p.id}`, window.location.origin).href
+    try { await navigator.clipboard.writeText(url); setShareStatus('Public project link copied.') }
+    catch { setShareStatus(`Public link: ${url}`) }
+  }
 
   async function confirmAction() {
     if (!action) return
@@ -162,6 +183,8 @@ export default function ProjectPage() {
   return (
     <div className="flex flex-col gap-8">
       {isMember && <div className="flex flex-wrap gap-3"><button onClick={() => setEditing(true)} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white">Edit project</button><button onClick={() => { setAction(isGroup ? 'leave' : 'delete'); setActionError('') }} className="rounded-lg border border-edge px-4 py-2 text-sm">{isGroup ? 'Leave project' : 'Delete project'}</button></div>}
+      {p.owner_id === me?.id && <button onClick={() => { setCompletionAction(p.status === 'active' ? 'archive' : 'reopen'); setCompletionError('') }} className="w-fit rounded-lg border border-accent/50 bg-accent-soft px-4 py-2 text-sm font-semibold text-accent">{p.status === 'active' ? 'Mark complete & showcase' : 'Reopen project'}</button>}
+      {completionAction && p.owner_id === me?.id && <section aria-label="Confirm project completion" className="rounded-xl border border-edge bg-card p-5"><h2 className="font-semibold">{completionAction === 'archive' ? 'Complete and showcase this project?' : 'Reopen this project?'}</h2><p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">{completionAction === 'archive' ? 'The project will be archived and listed in the public showcase. Your team, repository, and published weekly logs will remain visible at the same shareable link. New logs, invitations, and help requests pause until you reopen it.' : 'The project will return to active projects and leave the completed showcase. Your team and history will stay intact.'}</p>{completionError && <p role="alert" className="mt-3 text-sm text-warn">{completionError}</p>}<div className="mt-4 flex gap-3"><button disabled={completing} onClick={() => void changeCompletion()} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{completing ? 'Saving...' : completionAction === 'archive' ? 'Complete & publish to showcase' : 'Confirm reopen'}</button><button disabled={completing} onClick={() => setCompletionAction(null)} className="px-3 py-2 text-sm">Cancel</button></div></section>}
       {editing && isMember && <NewProject key={p.id} project={p} onDone={() => { setEditing(false); void refresh() }} />}
       {action && isMember && <section aria-label="Confirm project action" className="rounded-xl border border-edge bg-card p-5"><h2 className="font-semibold">{action === 'leave' ? 'Leave this project?' : 'Delete this project?'}</h2><p className="mt-2 text-sm text-muted">{action === 'leave' ? (p.owner_id === me?.id ? 'Your teammates will keep the project. Ownership will pass to a remaining participant.' : 'Your teammates will keep the project. You will lose editing access.') : 'This permanently removes the project and its logs, feedback, and related activity.'}</p>{actionError && <p role="alert" className="mt-3 text-sm text-warn">{actionError}</p>}<div className="mt-4 flex gap-3"><button disabled={busy} onClick={() => void confirmAction()} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{busy ? 'Working...' : action === 'leave' ? 'Confirm leave' : 'Confirm delete'}</button><button disabled={busy} onClick={() => setAction(null)} className="px-4 py-2 text-sm">Cancel</button></div></section>}
       <header className="rounded-2xl border border-edge bg-card p-6">
@@ -171,11 +194,11 @@ export default function ProjectPage() {
             <p className="mt-2 max-w-2xl text-ink/85">{p.description}</p>
           </div>
           <span className={`rounded-full px-3 py-1 font-mono text-xs ${p.status === 'active' ? 'bg-good-soft text-good' : 'bg-tile text-muted'}`}>
-            {p.status}
+            {p.status === 'archived' ? 'Completed / Archived' : 'In progress'}
           </span>
         </div>
 
-        {week && (
+        {week && p.status === 'active' && (
           <div className="mt-5">
             <div className="flex justify-between font-mono text-xs text-muted">
               <span>week {week.now} of {week.total}</span>
@@ -205,7 +228,7 @@ export default function ProjectPage() {
           <span className="font-mono text-muted">{p.tags.join(' · ')}</span>
         </div>
 
-        {p.looking_for.length > 0 && (
+        {p.status === 'active' && p.looking_for.length > 0 && (
           <p className="mt-4 flex flex-wrap items-center gap-2 text-sm">
             <span className="text-muted">Looking for</span>
             {p.looking_for.map((r) => (
@@ -213,20 +236,21 @@ export default function ProjectPage() {
             ))}
           </p>
         )}
+        {p.status === 'archived' && <div className="mt-5 rounded-xl border border-good/20 bg-good-soft p-4"><p className="text-sm font-semibold text-good">Completed project</p><p className="mt-1 text-sm text-muted">{p.end_date ? `Completed on ${new Date(p.end_date + 'T00:00').toLocaleDateString()}. ` : ''}Explore the team's work and the timeline below.</p><div className="mt-3 flex flex-wrap gap-4 text-sm"><Link to="/showcase" className="text-accent hover:underline">Browse the public showcase</Link><button onClick={() => void shareProject()} className="text-accent hover:underline">Copy public link</button></div>{shareStatus && <p role="status" className="mt-2 break-all text-xs text-muted">{shareStatus}</p>}</div>}
       </header>
 
       <div className="grid items-start gap-8 lg:grid-cols-[1fr_20rem]">
         <section className="min-w-0">
           <div className="flex items-center justify-between">
             <Label>timeline</Label>
-            {isMember && !writing && (
+            {isMember && p.status === 'active' && !writing && (
               <button onClick={() => setWriting(true)} className="mb-3 rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-white">
                 Write this week’s log
               </button>
             )}
           </div>
-          {writing && isMember && <LogEditor project={p} onDone={() => { setWriting(false); refresh() }} />}
-          {timeline.length === 0 && !writing && <p className="text-sm text-muted">No logs yet.</p>}
+          {writing && isMember && p.status === 'active' && <LogEditor project={p} onDone={() => { setWriting(false); refresh() }} />}
+          {timeline.length === 0 && (!writing || p.status === 'archived') && <p className="text-sm text-muted">No logs yet.</p>}
           <ol className="mt-2 border-l border-edge">
             {timeline.map((log) => (
               <li key={log.id} className="relative pb-6 pl-6">

@@ -335,6 +335,8 @@ export default function Profile() {
           </div>
         </section>
 
+        {allProjects.some(project => project.status === 'archived') && <section aria-label="Completed projects"><div className="mb-3 flex items-center justify-between gap-3"><Label>completed projects</Label><Link to="/showcase" className="text-xs text-accent hover:underline">Public showcase</Link></div><div className="grid gap-3 sm:grid-cols-2">{allProjects.filter(project => project.status === 'archived').map(project => <Link key={project.id} to={`/projects/${project.id}`} className="rounded-xl border border-good/20 bg-card p-4 hover:border-accent"><span className="text-[11px] font-medium uppercase tracking-wider text-good">Completed</span><h3 className="mt-1 font-semibold">{project.title}</h3><p className="mt-2 line-clamp-2 text-sm text-muted">{project.description}</p></Link>)}</div></section>}
+
         <section aria-label={preferences?.pinned_post_id ? 'Featured post' : 'Latest post'}>
           <Label>{preferences?.pinned_post_id ? 'featured post' : 'latest post'}</Label>
           {recentPosts.isPending && <p role="status" className="text-sm text-muted">Loading latest post...</p>}

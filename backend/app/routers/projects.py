@@ -59,7 +59,9 @@ def require_member(session: Session, project_id: int, user: User) -> None:
 
 @router.get("")
 def list_projects(q: str = "", tag: str = "", status: str = "active", session: Session = Depends(get_session)):
-    projects = session.exec(select(Project).where(Project.status == status).order_by(Project.created_at.desc())).all()
+    statement = select(Project).where(Project.status == status)
+    statement = statement.order_by(Project.end_date.desc(), Project.created_at.desc(), Project.id.desc()) if status == "archived" else statement.order_by(Project.created_at.desc())
+    projects = session.exec(statement).all()
     if q:
         projects = [p for p in projects if q.lower() in (p.title + " " + p.description).lower()]
     if tag:
@@ -175,6 +177,7 @@ def delete_project(project_id: int, user: User = Depends(current_user), session:
 def invite(project_id: int, to_id: int, user: User = Depends(current_user), session: Session = Depends(get_session)):
     get_project(session, project_id)
     require_member(session, project_id, user)
+    require_active(session, project_id)
     if to_id == user.id:
         raise HTTPException(400, "You can't invite yourself")
     if not session.get(User, to_id):
@@ -198,11 +201,32 @@ def archive(project_id: int, user: User = Depends(current_user), session: Sessio
     project = get_project(session, project_id)
     if project.owner_id != user.id:
         raise HTTPException(403, "Only the owner can archive a project")
-    project.status = "archived"
+    if project.status != "archived":
+        project.status = "archived"
+        project.end_date = date.today().isoformat()
     session.add(project)
     session.commit()
     session.refresh(project)
     return project
+
+
+@router.post("/{project_id}/reopen", response_model=Project)
+def reopen(project_id: int, user: User = Depends(current_user), session: Session = Depends(get_session)):
+    project = get_project(session, project_id)
+    if project.owner_id != user.id:
+        raise HTTPException(403, "Only the owner can reopen a project")
+    if project.status == "archived":
+        project.status = "active"
+        project.end_date = None
+        session.add(project)
+        session.commit()
+    session.refresh(project)
+    return project
+
+
+def require_active(session: Session, project_id: int) -> None:
+    if get_project(session, project_id).status != "active":
+        raise HTTPException(409, "This project is archived. The owner must reopen it before adding new activity.")
 
 
 # ---- Auto-docs -------------------------------------------------------------
@@ -213,6 +237,7 @@ def draft_log(project_id: int, user: User = Depends(current_user), session: Sess
     """Pull commits since the last log and ask Claude for a draft. Nothing is saved."""
     project = get_project(session, project_id)
     require_member(session, project_id, user)
+    require_active(session, project_id)
     if not project.repo_full_name:
         raise HTTPException(400, "Link a GitHub repo to this project first")
     last = session.exec(
@@ -243,6 +268,7 @@ def publish_log(
     """Save the (edited) draft to the timeline and share it to the feed."""
     get_project(session, project_id)
     require_member(session, project_id, user)
+    require_active(session, project_id)
     entry = LogEntry(project_id=project_id, author_id=user.id, **body.model_dump())
     session.add(entry)
     session.commit()
@@ -256,7 +282,7 @@ def publish_log(
 @router.get("/{project_id}/logs")
 def list_logs(project_id: int, session: Session = Depends(get_session)):
     return session.exec(
-        select(LogEntry).where(LogEntry.project_id == project_id).order_by(LogEntry.created_at.desc())
+        select(LogEntry).where(LogEntry.project_id == project_id, LogEntry.published).order_by(LogEntry.created_at.desc())
     ).all()
 
 

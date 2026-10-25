@@ -7,7 +7,7 @@ from ..auth import current_user
 from ..db import get_session
 from ..models import Endorsement, HelpRequest, User
 from ..services.skills import normalize
-from .projects import require_member
+from .projects import require_active, require_member
 
 router = APIRouter(prefix="/help", tags=["help"])
 
@@ -41,6 +41,7 @@ def ask(body: HelpIn, user: User = Depends(current_user), session: Session = Dep
     if not body.question.strip():
         raise HTTPException(400, "Write your question first")
     require_member(session, body.project_id, user)
+    require_active(session, body.project_id)
     req = HelpRequest(requester_id=user.id, **body.model_dump())
     session.add(req)
     session.commit()

@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Compass, Home, Inbox, LogOut, MessageSquare, Plus, Search, Shield, Trophy } from 'lucide-react'
+import { Award, Compass, Home, Inbox, LogOut, MessageSquare, Plus, Search, Shield, Trophy } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import Avatar from './Avatar'
 import { post } from '../lib/api'
@@ -9,7 +9,7 @@ import { useMe } from '../lib/auth'
 
 // LinkedIn-style tab: icon over a small label, underlined when active
 const tabClass = ({ isActive }: { isActive: boolean }) =>
-  `flex h-full w-12 flex-col items-center justify-center gap-0.5 border-b-2 text-[10px] sm:w-16 sm:text-xs lg:w-20 ${
+  `flex h-full w-12 shrink-0 flex-col items-center justify-center gap-0.5 border-b-2 text-[10px] sm:w-16 sm:text-xs lg:w-20 ${
     isActive ? 'border-ink text-ink' : 'border-transparent text-muted hover:text-ink'
   }`
 
@@ -59,9 +59,10 @@ export default function Layout() {
             <input id="search" name="q" aria-label="Search people and projects" placeholder="Search" className="w-full min-w-0 bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none" />
           </form>
 
-          <nav className="ml-auto flex h-full min-w-0 items-stretch">
+          <nav aria-label="Main navigation" className="ml-auto flex h-full min-w-0 items-stretch overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <Tab to="/feed" icon={Home} label="Home" />
             <Tab to="/explore" icon={Compass} label="Explore" />
+            <Tab to="/showcase" icon={Award} label="Showcase" />
             <Tab to="/challenges" icon={Trophy} label="Challenges" />
             <Tab to="/messages" icon={MessageSquare} label="Messages" />
             {isMentor ? <Tab to="/mentor" icon={Inbox} label="Help inbox" /> : <Tab to="/projects/new" icon={Plus} label="Project" />}

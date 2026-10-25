@@ -1,0 +1,17 @@
+﻿import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { ArrowLeft, ArrowUpRight, CheckCircle2, FolderGit2 } from 'lucide-react'
+import { api } from '../lib/api'
+import type { Project } from '../lib/types'
+
+export default function Showcase() {
+  const projects = useQuery({ queryKey: ['showcase'], queryFn: () => api<Project[]>('/projects?status=archived') })
+  return <div className="mx-auto max-w-6xl">
+    <Link to="/explore?category=projects" className="mb-5 inline-flex items-center gap-2 text-sm text-muted hover:text-accent"><ArrowLeft size={15} /> Explore active projects</Link>
+    <header className="mb-7"><p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-accent"><CheckCircle2 size={15} /> Project showcase</p><h1 className="text-3xl font-semibold">Built at Keystone</h1><p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">Completed projects, the teams behind them, and the work that made them happen. Explore the results and follow each project's journey.</p></header>
+    {projects.isPending && <p role="status" className="py-12 text-center text-muted">Loading completed projects...</p>}
+    {projects.isError && <div role="alert" className="rounded-xl border border-edge p-6"><p>Unable to load the showcase.</p><button onClick={() => void projects.refetch()} className="mt-3 text-sm text-accent">Try again</button></div>}
+    {projects.data?.length === 0 && <div className="rounded-2xl border border-dashed border-edge p-10 text-center"><FolderGit2 size={30} className="mx-auto mb-4 text-accent" /><h2 className="font-semibold">The next finished build belongs here</h2><p className="mx-auto mt-2 max-w-md text-sm text-muted">When a project owner marks their project complete, its team and published timeline become part of this public showcase.</p><Link to="/explore?category=projects" className="mt-5 inline-block text-sm text-accent hover:underline">Find a project to build</Link></div>}
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{projects.data?.map(project => <Link key={project.id} to={`/projects/${project.id}`} className="group flex min-w-0 flex-col rounded-2xl border border-edge bg-card p-5 transition-colors hover:border-accent/60"><div className="mb-4 flex items-center justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl bg-accent-soft text-accent"><FolderGit2 size={22} /></span><span className="flex items-center gap-1 rounded-full bg-good-soft px-2.5 py-1 text-xs text-good"><CheckCircle2 size={12} /> Completed</span></div><h2 className="break-words text-lg font-semibold group-hover:text-accent">{project.title}</h2><p className="mt-2 line-clamp-3 flex-1 break-words text-sm leading-relaxed text-muted">{project.description || 'Explore the team and their project timeline.'}</p><div className="my-4 flex flex-wrap gap-1.5">{project.tags.slice(0, 5).map(tag => <span key={tag} className="rounded-full bg-tile px-2 py-1 text-[11px] text-muted">{tag}</span>)}</div><div className="flex items-center justify-between gap-2 border-t border-edge pt-3 text-xs"><span className="text-muted">{project.end_date ? `Completed ${new Date(project.end_date + 'T00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}` : 'Archived project'}</span><span className="inline-flex items-center gap-1 text-accent">View project<ArrowUpRight size={13} /></span></div></Link>)}</div>
+  </div>
+}
