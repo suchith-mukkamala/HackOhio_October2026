@@ -7,6 +7,9 @@ Sample people have usernames starting with "sample_" and no password, so nobody 
 """
 
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+import base64
+import sys
 
 from sqlmodel import Session, select
 
@@ -28,25 +31,30 @@ PEOPLE = [
          bio="First hackathon season. Saying yes to everything.", expertise_tags=["Python", "JavaScript"]),
 ]
 
-IMG = "https://picsum.photos/seed/{}/1200/675"
-VIDEO = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4"
+MEDIA_DIR = Path(__file__).resolve().parent.parent / 'frontend' / 'public' / 'demo-posts'
+
+
+def media_asset(filename: str) -> str:
+    mime = 'video/mp4' if filename.endswith('.mp4') else 'image/svg+xml'
+    return f'data:{mime};base64,' + base64.b64encode((MEDIA_DIR / filename).read_bytes()).decode('ascii')
+
 
 # (author, hours ago, body, media url, media kind, [(commenter, comment)])
 POSTS = [
     ("sample_jordan", 2, "Rover arm picked up its first sample cup today. 4-DOF, all 3D printed. Next week: closing the loop on the wrist joint.",
-     IMG.format("rover-arm"), "image", [("sample_marcus", "Nice work. Log the joint angles so you can tune the wrist with real data."),
+     media_asset('rover-arm.svg'), "image", [("sample_marcus", "Nice work. Log the joint angles so you can tune the wrist with real data."),
                                         ("sample_liam", "This is so cool, is the club looking for new people?")]),
     ("sample_aisha", 5, "Ran a 6-person usability test on the bus arrival screen. Biggest finding: nobody noticed the 'delayed' color, so we're switching to a text label.",
-     IMG.format("usability-test"), "image", [("sample_raman", "Exactly the kind of evidence that makes a design decision easy. Keep the notes."),
+     media_asset('bus-arrivals.svg'), "image", [("sample_raman", "Exactly the kind of evidence that makes a design decision easy. Keep the notes."),
                                              ("sample_elena", "Did you time how long it took people to find their bus? Great before/after metric.")]),
     ("sample_liam", 9, "Finished my first 24-hour challenge: a study-room finder for Thompson Library. Rough, but it works on my phone.",
-     IMG.format("library-study"), "image", [("sample_elena", "Shipping something in 24 hours is the hard part. Proud of you."),]),
+     media_asset('study-room.svg'), "image", [("sample_elena", "Shipping something in 24 hours is the hard part. Proud of you."),]),
     ("sample_marcus", 14, "Office hours this Thursday: bring an architecture diagram and a question. I'll spend 15 minutes on each team.",
      None, None, [("sample_jordan", "Signing up for the rover dashboard!")]),
     ("sample_aisha", 20, "Short clip of the new onboarding animation. Feedback welcome, especially on timing.",
-     VIDEO, "video", [("sample_raman", "Smooth. Try shaving 200 ms off the first step.")]),
+     media_asset('onboarding.mp4'), "video", [("sample_raman", "Smooth. Try shaving 200 ms off the first step.")]),
     ("sample_elena", 30, "Reading list for anyone starting a data project this month: start with the question, then the dataset, then the model. Never the other way around.",
-     IMG.format("data-notes"), "image", []),
+     media_asset('data-project.svg'), "image", []),
 ]
 
 CHALLENGES = [  # (student, prompt, writeup, judge, score, feedback)
@@ -59,12 +67,36 @@ CHALLENGES = [  # (student, prompt, writeup, judge, score, feedback)
 ]
 
 
+def refresh_sample_media(session: Session) -> dict:
+    """Update only exact sample posts still using the known unrelated stock URLs."""
+    updated, skipped = 0, 0
+    for author, _hours, body, url, kind, _comments in POSTS:
+        if not url:
+            continue
+        user = session.exec(select(User).where(User.username == author)).first()
+        if not user:
+            continue
+        for post in session.exec(select(Post).where(Post.author_id == user.id, Post.body == body)).all():
+            if post.media_url == url and post.media_kind == kind:
+                continue
+            existing = post.media_url or ''
+            if not (existing.startswith('https://picsum.photos/seed/') or existing == 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'):
+                skipped += 1
+                continue
+            post.media_url, post.media_kind = url, kind
+            session.add(post)
+            updated += 1
+    return {'updated_sample_posts': updated, 'custom_media_preserved': skipped}
+
+
 def run() -> None:
     init_db()
     now = datetime.now(timezone.utc)
     with Session(engine) as s:
         if s.exec(select(User).where(User.username == "sample_marcus")).first():
-            print("Sample data already there; nothing changed.")
+            result = refresh_sample_media(s)
+            s.commit()
+            print(result)
             return
         people = {p["username"]: User(**p, email=f"{p['username']}@example.com") for p in PEOPLE}
         s.add_all(people.values())
@@ -96,4 +128,10 @@ def run() -> None:
 
 
 if __name__ == "__main__":
-    run()
+    if '--refresh-media' in sys.argv:
+        with Session(engine) as session:
+            result = refresh_sample_media(session)
+            session.commit()
+            print(result)
+    else:
+        run()

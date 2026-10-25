@@ -1,0 +1,23 @@
+[
+  {
+    "filename": "solar-reference.jpg",
+    "photographer": "American Public Power Association",
+    "source": "https://unsplash.com/photos/513dBrMJ_5w",
+    "license": "Unsplash License",
+    "usage": "Reference photograph for a fictional sample project; not a photograph of an actual team build."
+  },
+  {
+    "filename": "greenhouse-reference.jpg",
+    "photographer": "Aleksandr Malofeev",
+    "source": "https://unsplash.com/photos/Wbe9iEdiwX0",
+    "license": "Unsplash License",
+    "usage": "Reference photograph for a fictional sample project; not a photograph of an actual team build."
+  },
+  {
+    "filename": "circuit-reference.jpg",
+    "photographer": "Harrison Broadbent",
+    "source": "https://unsplash.com/photos/19YCOjHosDk",
+    "license": "Unsplash License",
+    "usage": "Reference photograph for a fictional sample project; not a photograph of an actual team build."
+  }
+]
