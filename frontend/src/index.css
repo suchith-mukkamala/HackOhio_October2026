@@ -93,11 +93,14 @@ body::after {
   border-radius: 9999px;
   background: linear-gradient(
     180deg,
-    rgba(175, 210, 255, 0.9),
-    rgba(88, 137, 255, 0.7) 28%,
-    rgba(88, 137, 255, 0.12) 100%
+    rgba(166, 230, 188, 0.98),
+    rgba(72, 168, 120, 0.82) 28%,
+    rgba(17, 79, 54, 0.28) 100%
   );
-  box-shadow: 0 0 10px rgba(110, 165, 255, 0.55), 0 0 18px rgba(110, 165, 255, 0.2);
+  box-shadow:
+    0 0 12px rgba(88, 180, 122, 0.9),
+    0 0 20px rgba(47, 128, 85, 0.7),
+    0 0 32px rgba(22, 87, 58, 0.38);
   transform: translate3d(0, 0, 0);
   animation-name: landingSparkFall;
   animation-timing-function: linear;
@@ -109,19 +112,19 @@ body::after {
     opacity: 0;
     transform: translate3d(0, -15%, 0) scale(0.7);
   }
-  10% {
+  12% {
     opacity: 1;
   }
   30% {
     opacity: 0.9;
-    transform: translate3d(14px, 30vh, 0) scale(1);
+    transform: translate3d(18px, 28vh, 0) scale(1.15);
   }
-  70% {
-    opacity: 0.55;
-    transform: translate3d(-10px, 70vh, 0) scale(0.95);
+  62% {
+    opacity: 0.8;
+    transform: translate3d(-14px, 62vh, 0) scale(1.05);
   }
   100% {
     opacity: 0;
-    transform: translate3d(18px, 115vh, 0) scale(0.7);
+    transform: translate3d(22px, 118vh, 0) scale(0.8);
   }
 }
