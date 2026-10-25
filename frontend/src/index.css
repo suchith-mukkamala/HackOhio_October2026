@@ -48,46 +48,4 @@ body {
   border-radius: 2rem 0.6rem 2rem 0.6rem;
 }
 
-.landing-spark {
-  position: absolute;
-  top: -12%;
-  display: block;
-  pointer-events: none;
-  border-radius: 9999px;
-  background: linear-gradient(
-    180deg,
-    rgba(166, 230, 188, 0.98),
-    rgba(72, 168, 120, 0.82) 28%,
-    rgba(17, 79, 54, 0.28) 100%
-  );
-  box-shadow:
-    0 0 12px rgba(88, 180, 122, 0.9),
-    0 0 20px rgba(47, 128, 85, 0.7),
-    0 0 32px rgba(22, 87, 58, 0.38);
-  transform: translate3d(0, 0, 0);
-  animation-name: landingSparkFall;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-}
 
-@keyframes landingSparkFall {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, -15%, 0) scale(0.7);
-  }
-  12% {
-    opacity: 1;
-  }
-  30% {
-    opacity: 0.9;
-    transform: translate3d(18px, 28vh, 0) scale(1.15);
-  }
-  62% {
-    opacity: 0.8;
-    transform: translate3d(-14px, 62vh, 0) scale(1.05);
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(22px, 118vh, 0) scale(0.8);
-  }
-}

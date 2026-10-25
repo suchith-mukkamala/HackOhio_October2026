@@ -5,15 +5,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Github } from 'lucide-react'
 import { ApiError, post } from '../lib/api'
 
-const sparkConfig = Array.from({ length: 28 }, (_, index) => ({
-  left: `${(index * 11 + (index % 5) * 9) % 100}%`,
-  duration: `${18 + (index % 7) * 4}s`,
-  delay: `${(index * 0.9 + (index % 4) * 0.5).toFixed(2)}s`,
-  size: `${2 + (index % 3)}px`,
-  opacity: 0.8 + (index % 4) * 0.08,
-  sway: `${-18 + (index % 9) * 4}px`,
-}))
-
 // Sign-in page; with `register` it becomes the create-account page at /register
 export default function Landing({ register = false }: { register?: boolean }) {
   const navigate = useNavigate()
@@ -39,24 +30,6 @@ export default function Landing({ register = false }: { register?: boolean }) {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-paper text-navy">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        {sparkConfig.map((spark, index) => (
-          <span
-            key={index}
-            className="landing-spark"
-            style={{
-              left: spark.left,
-              width: spark.size,
-              height: spark.size,
-              opacity: spark.opacity,
-              animationDuration: spark.duration,
-              animationDelay: spark.delay,
-              ['--sway' as any]: spark.sway,
-            }}
-          />
-        ))}
-      </div>
-
       {/* Soft background shapes, as on the Flash sign-in page */}
       <div className="pointer-events-none absolute -top-40 right-[-10%] h-[42rem] w-[42rem] rounded-full bg-blob/70" />
       <div className="pointer-events-none absolute -bottom-56 right-[-18%] h-[48rem] w-[56rem] rounded-full bg-blob-2/70" />
