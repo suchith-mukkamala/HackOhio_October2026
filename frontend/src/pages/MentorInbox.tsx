@@ -52,18 +52,70 @@ function RequestCard({ r, onAnswered, highlighted = false }: { r: HelpRequest; o
   )
 }
 
+const TIMES = [5, 15, 30] as const
+
+const chip = (on: boolean) =>
+  `rounded-full border px-3 py-1 text-xs font-medium ${on ? 'border-accent bg-accent-soft text-accent' : 'border-edge text-muted hover:border-accent'}`
+
 export default function MentorInbox() {
   const qc = useQueryClient()
   const [params] = useSearchParams()
   const requestedId = Number(params.get('request'))
   const inbox = useQuery({ queryKey: ['inbox'], queryFn: () => api<HelpRequest[]>('/help/inbox') })
+  const [minutes, setMinutes] = useState<number | null>(null)
+  const [skill, setSkill] = useState('')
 
-  const requests = [...(inbox.data ?? [])].sort((a, b) => Number(b.id === requestedId) - Number(a.id === requestedId))
+  const all = inbox.data ?? []
+  const skills = [...new Set(all.flatMap((r) => r.tags))].sort()
+  const activeSkill = skills.includes(skill) ? skill : '' // a skill that is no longer in the inbox stops filtering
+  const filtering = minutes !== null || activeSkill !== ''
+  // A request you were sent here to answer is never filtered out
+  const shown = all.filter(
+    (r) => r.id === requestedId || ((minutes === null || r.minutes === minutes) && (!activeSkill || r.tags.includes(activeSkill))),
+  )
+  const requests = [...shown].sort((a, b) => Number(b.id === requestedId) - Number(a.id === requestedId))
 
   return (
     <section className="flex flex-col gap-3">
       <h2 className="font-mono text-sm text-muted">{'// help requests for you'}</h2>
+      {all.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button aria-pressed={minutes === null} onClick={() => setMinutes(null)} className={chip(minutes === null)}>
+            Any time
+          </button>
+          {TIMES.map((m) => (
+            <button key={m} aria-pressed={minutes === m} onClick={() => setMinutes(m)} className={chip(minutes === m)}>
+              {m} min
+            </button>
+          ))}
+          {skills.length > 0 && (
+            <select
+              id="filter-skill"
+              aria-label="Filter by skill"
+              value={activeSkill}
+              onChange={(e) => setSkill(e.target.value)}
+              className="rounded-lg bg-tile px-2 py-1.5 text-xs"
+            >
+              <option value="">All skills</option>
+              {skills.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          )}
+          {filtering && (
+            <button onClick={() => { setMinutes(null); setSkill('') }} className="text-xs text-accent hover:underline">
+              Clear filters
+            </button>
+          )}
+          <span className="ml-auto font-mono text-xs text-muted">
+            {requests.length} of {all.length}
+          </span>
+        </div>
+      )}
       {inbox.data?.length === 0 && <p className="text-sm text-muted">No open requests right now.</p>}
+      {all.length > 0 && requests.length === 0 && <p className="text-sm text-muted">No requests match these filters.</p>}
       <ul className="flex flex-col gap-3">
         {requests.map((r) => (
           <RequestCard key={r.id} r={r} highlighted={r.id === requestedId} onAnswered={() => { void qc.invalidateQueries({ queryKey: ['inbox'] }); void qc.invalidateQueries({ queryKey: ['home-sidebar'] }) }} />
