@@ -170,9 +170,7 @@ export function PostCard({ item, meId, onChange }: { item: FeedItem; meId?: numb
 
       <footer className="mt-4 border-t border-edge pt-3">
         {comments.map((c) => (
-          <p key={c.id} className="mb-2 rounded-lg bg-tile px-3 py-2 text-sm text-ink/85">
-            {c.body}
-          </p>
+          <p key={c.id} className="mb-2 rounded-lg bg-tile px-3 py-2 text-sm text-ink/85">{c.body}</p>
         ))}
         <div className="flex items-center gap-2">
           <input
