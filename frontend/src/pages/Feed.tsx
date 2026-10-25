@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { CircleCheck, CircleHelp, Lightbulb, Send } from 'lucide-react'
+import { CircleCheck, CircleHelp, Lightbulb, Send, Trash2 } from 'lucide-react'
 import './Feed.css'
 import HomeSidebar from '../components/HomeSidebar'
 import { Ladder, OrgsCard } from '../components/Community'
