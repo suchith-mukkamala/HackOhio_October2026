@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import Feed from './Feed'
-import MentorInbox from './MentorInbox'
 import { api } from '../lib/api'
 import { useMe } from '../lib/auth'
 import type { Project } from '../lib/types'
@@ -28,7 +27,7 @@ function ProjectsOverview() {
   )
 }
 
-// One home per kind of user: students get the feed; industry pros and faculty get their work first
+// Faculty keep their project overview; mentor requests live exclusively in the Mentor tab.
 export default function Home() {
   const { data: me } = useMe()
   if (!me) return null
@@ -36,7 +35,6 @@ export default function Home() {
   return (
     <div className="flex flex-col gap-10">
       {me.role === 'faculty' && <ProjectsOverview />}
-      <MentorInbox />
       <section className="flex flex-col gap-3">
         <h2 className="font-mono text-sm text-muted">{'// what students are building'}</h2>
         <Feed />
