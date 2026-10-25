@@ -5,6 +5,14 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Github } from 'lucide-react'
 import { ApiError, post } from '../lib/api'
 
+const sparkConfig = Array.from({ length: 18 }, (_, index) => ({
+  left: `${(index * 11 + 6) % 100}%`,
+  duration: `${16 + (index % 6) * 3}s`,
+  delay: `${(index * 0.9).toFixed(1)}s`,
+  size: `${5 + (index % 4) * 2}px`,
+  opacity: 0.18 + (index % 5) * 0.08,
+}))
+
 // Sign-in page; with `register` it becomes the create-account page at /register
 export default function Landing({ register = false }: { register?: boolean }) {
   const navigate = useNavigate()
@@ -30,6 +38,23 @@ export default function Landing({ register = false }: { register?: boolean }) {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-paper text-navy">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        {sparkConfig.map((spark, index) => (
+          <span
+            key={index}
+            className="landing-spark"
+            style={{
+              left: spark.left,
+              width: spark.size,
+              height: `${Number.parseFloat(spark.size) * 2.2}px`,
+              opacity: spark.opacity,
+              animationDuration: spark.duration,
+              animationDelay: spark.delay,
+            }}
+          />
+        ))}
+      </div>
+
       {/* Soft background shapes, as on the Flash sign-in page */}
       <div className="pointer-events-none absolute -top-40 right-[-10%] h-[42rem] w-[42rem] rounded-full bg-blob/70" />
       <div className="pointer-events-none absolute -bottom-56 right-[-18%] h-[48rem] w-[56rem] rounded-full bg-blob-2/70" />
@@ -48,7 +73,7 @@ export default function Landing({ register = false }: { register?: boolean }) {
                   <legend className="mb-1.5 text-sm font-medium">I am a…</legend>
                   <div className="grid grid-cols-3 gap-2">
                     {([['student', 'Student'], ['faculty', 'Faculty'], ['mentor', 'Industry pro']] as const).map(([value, label]) => (
-                      <label key={value} className={`cursor-pointer rounded-xl border px-3 py-2.5 text-center text-sm font-medium ${role === value ? 'border-brand bg-brand/10 text-brand' : 'border-line bg-white hover:border-brand'}`}>
+                      <label key={value} className={`cursor-pointer rounded-xl border px-3 py-2.5 text-center text-sm font-medium ${role === value ? 'border-brand bg-brand/10 text-brand' : 'border-line bg-white text-slate hover:border-brand/60'}`}>
                         <input type="radio" name="role" value={value} checked={role === value} onChange={() => setRole(value)} className="sr-only" />
                         {label}
                       </label>
