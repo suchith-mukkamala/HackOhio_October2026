@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent } from 'react'
 import type { SkillGraph, SkillNode } from '../lib/types'
 import './SkillGraphView.css'
@@ -10,12 +10,24 @@ const C = SIZE / 2
 const RING = [0, 110, 200, 280, 350] // radius by depth; depth 1 = top-level categories
 const PULSE_AT = 0.6 // nodes at or above this pulse value animate
 
+function growthProgress(time: number): number {
+  const acceleration = .04
+  const deceleration = .15
+  const distance = 1 - (acceleration + deceleration) / 2
+  // Reach cruising speed quickly; retain the longer, gentle slowdown at the end.
+  if (time < acceleration) return (time - acceleration / Math.PI * Math.sin(Math.PI * time / acceleration)) / (2 * distance)
+  if (time > 1 - deceleration) {
+    const remaining = 1 - time
+    return 1 - (remaining - deceleration / Math.PI * Math.sin(Math.PI * remaining / deceleration)) / (2 * distance)
+  }
+  return (time - acceleration / 2) / distance
+}
+
 interface Placed {
   node: SkillNode
   x: number
   y: number
   r: number
-  hasHidden: boolean
 }
 
 interface Layout {
@@ -24,7 +36,7 @@ interface Layout {
   treeLinks: [string, string | null][] // [child, parent]; parent null = joins the center
 }
 
-function layout(nodes: SkillNode[], isOpen: (skill: string) => boolean): Layout {
+function layout(nodes: SkillNode[]): Layout {
   const byName = new Map(nodes.map((n) => [n.skill, n]))
   const kids = new Map<string, SkillNode[]>()
   const roots: SkillNode[] = []
@@ -38,7 +50,7 @@ function layout(nodes: SkillNode[], isOpen: (skill: string) => boolean): Layout 
     }
   }
 
-  const visibleKids = (n: SkillNode) => (isOpen(n.skill) ? (kids.get(n.skill) ?? []) : [])
+  const visibleKids = (n: SkillNode) => kids.get(n.skill) ?? []
   const leaves = (n: SkillNode): number => {
     const k = visibleKids(n)
     return k.length ? k.reduce((s, c) => s + leaves(c), 0) : 1
@@ -57,7 +69,6 @@ function layout(nodes: SkillNode[], isOpen: (skill: string) => boolean): Layout 
       x: C + ring * Math.cos(angle),
       y: C + ring * Math.sin(angle),
       r,
-      hasHidden: (kids.get(n.skill)?.length ?? 0) > 0 && !isOpen(n.skill),
     })
     treeLinks.push([n.skill, parent])
 
@@ -99,19 +110,43 @@ interface Props {
 }
 
 export default function SkillGraphView({ graph, name, particles = true, reduceMotion = false, highlightedSkills = [] }: Props) {
-  // Start every branch expanded so no skill is hidden on first view.
-  const [flipped, setFlipped] = useState<Set<string>>(new Set())
+  const [growth, setGrowth] = useState(() => reduceMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 0)
+  const growthFinished = useRef(growth === 1)
+  useEffect(() => {
+    if (growthFinished.current) return
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
+    let frame = 0
+    let previous = 0
+    const start = performance.now()
+    const finish = () => {
+      cancelAnimationFrame(frame)
+      growthFinished.current = true
+      setGrowth(1)
+    }
+    const tick = (time: number) => {
+      const progress = Math.min(1, (time - start) / 6000)
+      if (time - previous >= 32 || progress === 1) {
+        setGrowth(growthProgress(progress))
+        previous = time
+      }
+      if (progress < 1) frame = requestAnimationFrame(tick)
+      else growthFinished.current = true
+    }
+    const onMotionChange = () => { if (motion.matches) finish() }
+    if (reduceMotion || motion.matches) finish()
+    else frame = requestAnimationFrame(tick)
+    motion.addEventListener('change', onMotionChange)
+    return () => { cancelAnimationFrame(frame); motion.removeEventListener('change', onMotionChange) }
+  }, [reduceMotion])
+  // Keep every branch fully extended; selecting a node opens its evidence.
   const { ref: gestureRef, camera } = useGraphGestures(graph.nodes.length > 0)
   const [selected, setSelected] = useState<string | null>(null)
 
   const nodeByName = useMemo(() => new Map(graph.nodes.map((n) => [n.skill, n])), [graph.nodes])
 
-  const { placed, treeLinks, bounds } = useMemo(() => {
-    const isOpen = (skill: string) => {
-      return !flipped.has(skill)
-    }
-    return layout(graph.nodes, isOpen)
-  }, [graph.nodes, flipped])
+  const { placed: finalPlaced, treeLinks, bounds } = useMemo(() => layout(graph.nodes), [graph.nodes])
+  // Every anchor moves together. Lines and particle routes use these same live positions.
+  const placed = finalPlaced.map(point => ({ ...point, x: C + (point.x - C) * growth, y: C + (point.y - C) * growth }))
 
   // Keep the original 1020:800 display proportions while fitting every label.
   const displayWidth = Math.max(bounds.width, bounds.height * 1020 / 800)
@@ -124,26 +159,14 @@ export default function SkillGraphView({ graph, name, particles = true, reduceMo
 
   const pos = new Map(placed.map((p) => [p.node.skill, p]))
   const sel = selected ? nodeByName.get(selected) : undefined
-  const hasChildren = (skill: string) => graph.nodes.some((n) => n.parent === skill)
-
-  const onNodeClick = (skill: string) => {
-    setSelected(skill)
-    if (hasChildren(skill)) {
-      setFlipped((prev) => {
-        const next = new Set(prev)
-        if (next.has(skill)) next.delete(skill)
-        else next.add(skill)
-        return next
-      })
-    }
-  }
+  const onNodeClick = (skill: string) => setSelected(skill)
 
   if (graph.nodes.length === 0) {
     return <p className="sg-empty">No skills yet. Pick a few or push a project to grow your graph.</p>
   }
 
   return (
-    <div className={`skillgraph ${!particles ? 'sg-no-particles' : ''} ${reduceMotion ? 'sg-reduce-motion' : ''}`}>
+    <div data-growth={growth.toFixed(4)} className={`skillgraph ${!particles ? 'sg-no-particles' : ''} ${reduceMotion ? 'sg-reduce-motion' : ''}`}>
       <svg
         ref={gestureRef}
         viewBox={`${viewX - camera.x * displayWidth / camera.scale} ${viewY - camera.y * displayHeight / camera.scale} ${displayWidth / camera.scale} ${displayHeight / camera.scale}`}
@@ -186,15 +209,8 @@ export default function SkillGraphView({ graph, name, particles = true, reduceMo
           return <FlowParticle key={`flow-${leaf.node.skill}`} path={path} color="yellow" duration={30 + index % 11} delay={(index * 9.17) % 37} scale={camera.scale} />
         })}
 
-        <g className="sg-center" transform={fixedSizeAt(C, C)}>
-          <circle cx={C} cy={C} r={34} />
-          <text x={C} y={C} dy="0.35em" textAnchor="middle">
-            {(name ?? 'You').split(' ')[0]}
-          </text>
-        </g>
-
         {/* nodes */}
-        {placed.map(({ node, x, y, r, hasHidden }) => {
+        {placed.map(({ node, x, y, r }) => {
           const pulsing = node.pulse >= PULSE_AT
           const cls = [
             'sg-node',
@@ -206,7 +222,10 @@ export default function SkillGraphView({ graph, name, particles = true, reduceMo
             .filter(Boolean)
             .join(' ')
           // stronger pulse = shorter beat (about 3s down to 1.2s)
-          const style = { '--dur': `${(3 - node.pulse * 1.8).toFixed(2)}s` } as CSSProperties
+          const style = {
+            '--dur': `${(3 - node.pulse * 1.8).toFixed(2)}s`,
+            opacity: Math.min(1, growth * 5),
+          } as CSSProperties
           const onKey = (e: KeyboardEvent<SVGGElement>) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault()
@@ -215,23 +234,22 @@ export default function SkillGraphView({ graph, name, particles = true, reduceMo
           }
           const right = x >= C
           return (
+            <g key={node.skill} className="sg-sprout" style={style}>
             <g
-              key={node.skill}
               transform={fixedSizeAt(x, y)}
               className={cls}
-              style={style}
               tabIndex={0}
               role="button"
-              aria-label={`${node.skill}, ${node.tier}${hasHidden ? ', has collapsed skills' : ''}`}
+              aria-label={`${node.skill}, ${node.tier}`}
               onClick={() => onNodeClick(node.skill)}
               onKeyDown={onKey}
             >
               <circle className="sg-node-background" cx={x} cy={y} r={r + 1} />
               <circle className="sg-halo" cx={x} cy={y} r={r * 1.3} />
-              {hasHidden && <circle className="sg-more" cx={x} cy={y} r={r + 6} />}
               <circle className="sg-dot" cx={x} cy={y} r={r} />
               <text
                 className="sg-label"
+                style={{ opacity: Math.max(0, Math.min(1, (growth - .35) / .35)) }}
                 x={x + (right ? r + 8 : -(r + 8))}
                 y={y}
                 dy="0.35em"
@@ -240,8 +258,15 @@ export default function SkillGraphView({ graph, name, particles = true, reduceMo
                 {node.skill}
               </text>
             </g>
+            </g>
           )
         })}
+        <g className="sg-center" transform={fixedSizeAt(C, C)}>
+          <circle cx={C} cy={C} r={34} />
+          <text x={C} y={C} dy="0.35em" textAnchor="middle">
+            {(name ?? 'You').split(' ')[0]}
+          </text>
+        </g>
       </svg>
 
       {sel && (
@@ -263,7 +288,7 @@ export default function SkillGraphView({ graph, name, particles = true, reduceMo
             <p>
               {sel.tier === 'derived'
                 ? 'Shown because a skill under it is strong.'
-                : 'No evidence of its own. Click to open or close its skills.'}
+                : 'Part of your fully expanded skill tree. No evidence of its own yet.'}
             </p>
           )}
         </div>
