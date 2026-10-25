@@ -13,6 +13,9 @@ from .models import User
 COOKIE = "session"
 ALGORITHM = "HS256"
 
+if user.is_banned:
+    raise HTTPException(status_code=403, detail="This account has been suspended")
+
 
 def set_session_cookie(response: Response, user_id: int) -> None:
     token = jwt.encode(
