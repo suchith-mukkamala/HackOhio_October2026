@@ -6,7 +6,7 @@ Keep frontend/src/lib/types.ts in sync when you change a field here.
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import JSON, Column
+from sqlalchemy import JSON, Column, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -170,6 +170,21 @@ class Message(SQLModel, table=True):
     sender_id: int = Field(foreign_key="user.id")
     body: str
     created_at: datetime = Field(default_factory=now)
+
+
+class ConnectionRequest(SQLModel, table=True):
+    """One consent-based, mutual connection per unordered pair of people."""
+    __table_args__ = (UniqueConstraint('low_id', 'high_id', name='connection_pair'),)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    low_id: int = Field(foreign_key='user.id', index=True)
+    high_id: int = Field(foreign_key='user.id', index=True)
+    sender_id: int = Field(foreign_key='user.id', index=True)
+    recipient_id: int = Field(foreign_key='user.id', index=True)
+    thread_id: int = Field(foreign_key='thread.id')
+    message_id: int = Field(foreign_key='message.id', unique=True)
+    status: str = 'pending'  # pending | accepted | denied
+    created_at: datetime = Field(default_factory=now)
+    responded_at: Optional[datetime] = None
 
 
 class Experience(SQLModel, table=True):

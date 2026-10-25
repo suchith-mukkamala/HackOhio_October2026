@@ -51,6 +51,22 @@ export interface LogEntry {
 
 export type MediaKind = 'image' | 'video' | 'youtube'
 
+export interface FollowRequest {
+  id: number
+  sender_id: number
+  recipient_id: number
+  thread_id: number
+  message_id: number
+  status: 'pending' | 'accepted' | 'denied'
+  created_at: string
+  responded_at: string | null
+}
+
+export interface ConnectionsData {
+  connections: User[]
+  requests: (FollowRequest & { user: User })[]
+}
+
 export interface Comment {
   id: number
   author_id: number

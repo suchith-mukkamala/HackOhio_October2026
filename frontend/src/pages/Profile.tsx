@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Briefcase, Github, GraduationCap, MessageSquare, Pencil, Upload, X } from 'lucide-react' // CHANGED: added X
 import Avatar from '../components/Avatar'
+import FollowButton from '../components/FollowButton'
 import ProfileSettings from '../components/ProfileSettings'
 import SkillGraphView from '../components/SkillGraphView'
 import { ApiError, api, put } from '../lib/api'
@@ -224,6 +225,7 @@ export default function Profile() {
         {Boolean(preferences?.preferred_roles?.length) && <p className="text-sm text-muted">Roles: {preferences!.preferred_roles.join(', ')}</p>}
         {Boolean(preferences?.interests?.length) && <p className="text-sm text-muted">Interests: {preferences!.interests.join(', ')}</p>}
         {(preferences?.show_contact || isMe) && <div className="flex flex-wrap gap-3 text-sm text-accent">{preferences?.website && <a href={preferences.website} target="_blank" rel="noreferrer" className="hover:underline">Website</a>}{preferences?.linkedin && <a href={preferences.linkedin} target="_blank" rel="noreferrer" className="hover:underline">LinkedIn</a>}{preferences?.contact_email && <a href={`mailto:${preferences.contact_email}`} className="hover:underline">Contact</a>}</div>}
+        {me && me.id !== user.id && <FollowButton userId={user.id} viewerId={me.id} />}
         {me && me.id !== user.id && (
           <Link to={`/messages?to=${user.id}`} className="flex items-center justify-center gap-2 rounded-lg border border-edge bg-tile py-2 text-sm font-medium hover:border-accent">
             <MessageSquare size={16} /> Message

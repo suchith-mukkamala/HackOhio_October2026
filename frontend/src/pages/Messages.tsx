@@ -3,11 +3,12 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, MessageSquare, Plus, Send } from 'lucide-react'
 import Avatar from '../components/Avatar'
+import FollowRequestNotice from '../components/FollowRequestNotice'
 import { api, post } from '../lib/api'
 import { headline, useMe } from '../lib/auth'
-import type { User } from '../lib/types'
+import type { FollowRequest, User } from '../lib/types'
 
-type Message = { id: number; sender_id: number; body: string; created_at: string }
+type Message = { id: number; sender_id: number; body: string; created_at: string; follow_request?: FollowRequest | null }
 type Thread = { id: number; with: User[]; last: Message | null }
 const inputClass = 'w-full rounded-xl border border-edge bg-tile px-4 py-3 text-sm outline-none focus:border-accent'
 const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-40'
@@ -80,7 +81,7 @@ function Inbox({ me }: { me: User }) {
           <header className="flex items-start gap-3 border-b border-edge p-4"><button aria-label="Back to conversations" onClick={() => setParams({})} className="p-1 md:hidden"><ArrowLeft size={20} /></button><div className="min-w-0"><h2 className="font-semibold">{threadName(selected)}</h2><div className="mt-1 flex flex-wrap gap-2 text-xs text-accent">{selected.with.map(user => <Link key={user.id} to={`/u/${user.id}`} className="hover:underline">{user.name}</Link>)}</div></div></header>
           <div aria-label="Messages" className="min-h-[250px] flex-1 space-y-4 overflow-y-auto p-5">
             {messages.isPending && <p role="status">Loading messages...</p>}{messages.isError && <p role="alert">Unable to refresh messages. <button onClick={() => void messages.refetch()} className="text-accent">Retry</button></p>}
-            {messages.data?.map(message => <div key={message.id} className={`flex ${message.sender_id === me.id ? 'justify-end' : 'justify-start'}`}><div className="max-w-[85%]"><p className="mb-1 text-xs text-muted">{message.sender_id === me.id ? 'You' : selected.with.find(user => user.id === message.sender_id)?.name ?? 'Member'}</p><p className={`whitespace-pre-wrap break-words rounded-2xl px-4 py-3 text-sm ${message.sender_id === me.id ? 'bg-accent text-white' : 'bg-tile'}`}>{message.body}</p><time className="mt-1 block text-[10px] text-muted">{time(message.created_at)}</time></div></div>)}
+            {messages.data?.map(message => <div key={message.id} className={`flex ${message.sender_id === me.id ? 'justify-end' : 'justify-start'}`}><div className="max-w-[85%]"><p className="mb-1 text-xs text-muted">{message.sender_id === me.id ? 'You' : selected.with.find(user => user.id === message.sender_id)?.name ?? 'Member'}</p>{message.follow_request ? <FollowRequestNotice request={message.follow_request} viewerId={me.id} /> : <p className={`whitespace-pre-wrap break-words rounded-2xl px-4 py-3 text-sm ${message.sender_id === me.id ? 'bg-accent text-white' : 'bg-tile'}`}>{message.body}</p>}<time className="mt-1 block text-[10px] text-muted">{time(message.created_at)}</time></div></div>)}
             {!messages.isPending && !messages.isError && !messages.data?.length && <p className="py-10 text-center text-sm text-muted">Say hello to start the conversation.</p>}<div ref={bottom} />
           </div>
           <form className="border-t border-edge p-4" onSubmit={event => { event.preventDefault(); if (draft.trim() && !send.isPending) send.mutate({ id: selected.id, body: draft.trim() }) }}>

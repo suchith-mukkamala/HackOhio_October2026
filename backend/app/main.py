@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 
 from .db import init_db
-from .routers import admin, auth, community, help, home, projects, settings, social, users
+from .routers import admin, auth, community, connections, help, home, projects, settings, social, users
 
 
 @asynccontextmanager
@@ -23,7 +23,7 @@ def health():
     return {"ok": True}
 
 
-for r in (auth.router, users.router, projects.router, help.router, social.router, settings.router, admin.router, home.router, community.router):
+for r in (auth.router, users.router, projects.router, help.router, social.router, connections.router, settings.router, admin.router, home.router, community.router):
     api.include_router(r)
 
 app.include_router(api)

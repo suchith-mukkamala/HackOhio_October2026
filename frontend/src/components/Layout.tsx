@@ -1,12 +1,12 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Award, Compass, Home, Inbox, LogOut, MessageSquare, Plus, Search, Shield, Trophy } from 'lucide-react'
+import { Award, Compass, Home, Inbox, LogOut, MessageSquare, Plus, Search, Shield, Trophy, UsersRound } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import Avatar from './Avatar'
 import { api, post } from '../lib/api'
 import { usePageNavigation } from '../lib/usePageNavigation'
 import { useMe } from '../lib/auth'
-import type { HelpRequest } from '../lib/types'
+import type { ConnectionsData, HelpRequest } from '../lib/types'
 
 // Icon-only navigation, underlined when active.
 const tabClass = ({ isActive }: { isActive: boolean }) =>
@@ -40,6 +40,8 @@ export default function Layout() {
   // Same query as the Help inbox page, so the badge and the page share one request and update together
   const inbox = useQuery({ queryKey: ['inbox'], queryFn: () => api<HelpRequest[]>('/help/inbox'), enabled: isMentor, refetchInterval: 60_000 })
   const openRequests = inbox.data?.length ?? 0
+  const connections = useQuery({ queryKey: ['connections', me?.id], queryFn: () => api<ConnectionsData>('/connections'), enabled: Boolean(me), refetchInterval: 5000 })
+  const followRequests = connections.data?.requests.filter(request => request.recipient_id === me?.id && request.status === 'pending').length ?? 0
 
   async function signOut() {
     if (!window.confirm('Are you sure you want to log out?')) return
@@ -77,6 +79,7 @@ export default function Layout() {
             <Tab to="/showcase" icon={Award} label="Showcase" />
             <Tab to="/challenges" icon={Trophy} label="Challenges" />
             <Tab to="/messages" icon={MessageSquare} label="Messages" />
+            <Tab to="/connections" icon={UsersRound} label="Connections" badge={followRequests} />
             {isMentor ? <Tab to="/mentor" icon={Inbox} label="Help inbox" badge={openRequests} /> : <Tab to="/projects/new" icon={Plus} label="Project" />}
             {me?.is_admin && <Tab to="/admin" icon={Shield} label="Admin" />}
             {me && (

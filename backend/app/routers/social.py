@@ -10,6 +10,7 @@ from ..auth import current_user, optional_user
 from ..services.profile_settings import preferences, may_contact, public_user
 from ..db import get_session
 from ..models import Challenge, Comment, LogEntry, Message, Post, Project, PublicUser, Thread, ThreadMember, User
+from .connections import message_data, thread_messages_data
 
 router = APIRouter(tags=["social"])
 
@@ -197,8 +198,8 @@ def my_threads(user: User = Depends(current_user), session: Session = Depends(ge
         last = session.exec(
             select(Message).where(Message.thread_id == tid).order_by(Message.created_at.desc(), Message.id.desc())
         ).first()
-        out.append({"id": tid, "with": [public_user(session, o, user) for o in others], "last": last})
-    return sorted(out, key=lambda t: t["last"].id if t["last"] else 0, reverse=True)
+        out.append({"id": tid, "with": [public_user(session, o, user) for o in others], "last": message_data(session, last) if last else None})
+    return sorted(out, key=lambda t: t["last"]["id"] if t["last"] else 0, reverse=True)
 
 
 @router.post("/threads")
@@ -238,7 +239,7 @@ def require_member(session: Session, thread_id: int, user: User) -> None:
 @router.get("/threads/{thread_id}/messages")
 def messages(thread_id: int, user: User = Depends(current_user), session: Session = Depends(get_session)):
     require_member(session, thread_id, user)
-    return session.exec(select(Message).where(Message.thread_id == thread_id).order_by(Message.created_at, Message.id)).all()
+    return thread_messages_data(session, thread_id)
 
 
 @router.post("/threads/{thread_id}/messages", response_model=Message)
