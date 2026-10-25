@@ -7,7 +7,7 @@ import { post } from '../lib/api'
 import { usePageNavigation } from '../lib/usePageNavigation'
 import { useMe } from '../lib/auth'
 
-// LinkedIn-style tab: icon over a small label, underlined when active
+// Icon-only navigation, underlined when active.
 const tabClass = ({ isActive }: { isActive: boolean }) =>
   `flex h-full w-12 shrink-0 flex-col items-center justify-center gap-0.5 border-b-2 text-[10px] sm:w-16 sm:text-xs lg:w-20 ${
     isActive ? 'border-ink text-ink' : 'border-transparent text-muted hover:text-ink'
@@ -16,9 +16,8 @@ const tabClass = ({ isActive }: { isActive: boolean }) =>
 const Tab = ({ to, icon: Icon, label }: { to: string; icon: LucideIcon; label: string }) => {
   const { onLinkClick } = usePageNavigation()
   return (
-    <NavLink to={to} onClick={event => onLinkClick(event, to)} className={tabClass}>
-      <Icon size={22} strokeWidth={1.75} />
-      {label}
+    <NavLink to={to} aria-label={label} onClick={event => onLinkClick(event, to)} className={tabClass}>
+      <Icon size={22} strokeWidth={1.75} aria-hidden="true" />
     </NavLink>
   )
 }
@@ -31,6 +30,7 @@ export default function Layout() {
   const isMentor = me?.role === 'mentor' || me?.role === 'faculty'
 
   async function signOut() {
+    if (!window.confirm('Are you sure you want to log out?')) return
     await post('/auth/logout')
     qc.clear()
     navigate('/')
@@ -68,8 +68,8 @@ export default function Layout() {
             {isMentor ? <Tab to="/mentor" icon={Inbox} label="Help inbox" /> : <Tab to="/projects/new" icon={Plus} label="Project" />}
             {me?.is_admin && <Tab to="/admin" icon={Shield} label="Admin" />}
             {me && (
-              <NavLink to={`/u/${me.id}`} onClick={event => onLinkClick(event, `/u/${me.id}`)} className={tabClass}>
-                <Avatar user={me} size={24} /> Me
+              <NavLink to={`/u/${me.id}`} aria-label="Your profile" onClick={event => onLinkClick(event, `/u/${me.id}`)} className={tabClass}>
+                <Avatar user={me} size={24} />
               </NavLink>
             )}
           </nav>
