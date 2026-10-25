@@ -1,23 +1,32 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Award, Compass, Home, Inbox, LogOut, MessageSquare, Plus, Search, Shield, Trophy } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import Avatar from './Avatar'
-import { post } from '../lib/api'
+import { api, post } from '../lib/api'
 import { usePageNavigation } from '../lib/usePageNavigation'
 import { useMe } from '../lib/auth'
+import type { HelpRequest } from '../lib/types'
 
 // Icon-only navigation, underlined when active.
 const tabClass = ({ isActive }: { isActive: boolean }) =>
-  `flex h-full min-w-12 shrink-0 flex-col items-center justify-center gap-0.5 border-b-2 px-2 text-[10px] sm:min-w-14 sm:px-3.5 sm:text-xs ${
+  `flex h-full w-12 shrink-0 flex-col items-center justify-center gap-0.5 border-b-2 text-[10px] sm:w-16 sm:text-xs lg:w-20 ${
     isActive ? 'border-ink text-ink' : 'border-transparent text-muted hover:text-ink'
   }`
 
-const Tab = ({ to, icon: Icon, label }: { to: string; icon: LucideIcon; label: string }) => {
+// `badge` shows a small count on the icon (hidden when 0)
+const Tab = ({ to, icon: Icon, label, badge = 0 }: { to: string; icon: LucideIcon; label: string; badge?: number }) => {
   const { onLinkClick } = usePageNavigation()
   return (
-    <NavLink to={to} aria-label={label} onClick={event => onLinkClick(event, to)} className={tabClass}>
-      <Icon size={22} strokeWidth={1.75} aria-hidden="true" />
+    <NavLink to={to} aria-label={badge > 0 ? `${label}, ${badge} open` : label} onClick={event => onLinkClick(event, to)} className={tabClass}>
+      <span className="relative">
+        <Icon size={22} strokeWidth={1.75} aria-hidden="true" />
+        {badge > 0 && (
+          <span aria-hidden="true" className="absolute -top-1.5 -right-2.5 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] leading-none font-semibold text-white">
+            {badge > 99 ? '99+' : badge}
+          </span>
+        )}
+      </span>
     </NavLink>
   )
 }
@@ -28,6 +37,9 @@ export default function Layout() {
   const { go: navigate, onLinkClick } = usePageNavigation()
   const location = useLocation()
   const isMentor = me?.role === 'mentor' || me?.role === 'faculty'
+  // Same query as the Help inbox page, so the badge and the page share one request and update together
+  const inbox = useQuery({ queryKey: ['inbox'], queryFn: () => api<HelpRequest[]>('/help/inbox'), enabled: isMentor, refetchInterval: 60_000 })
+  const openRequests = inbox.data?.length ?? 0
 
   async function signOut() {
     if (!window.confirm('Are you sure you want to log out?')) return
@@ -65,7 +77,7 @@ export default function Layout() {
             <Tab to="/showcase" icon={Award} label="Showcase" />
             <Tab to="/challenges" icon={Trophy} label="Challenges" />
             <Tab to="/messages" icon={MessageSquare} label="Messages" />
-            {isMentor ? <Tab to="/mentor" icon={Inbox} label="Help inbox" /> : <Tab to="/projects/new" icon={Plus} label="Project" />}
+            {isMentor ? <Tab to="/mentor" icon={Inbox} label="Help inbox" badge={openRequests} /> : <Tab to="/projects/new" icon={Plus} label="Project" />}
             {me?.is_admin && <Tab to="/admin" icon={Shield} label="Admin" />}
             {me && (
               <NavLink to={`/u/${me.id}`} aria-label="Your profile" onClick={event => onLinkClick(event, `/u/${me.id}`)} className={tabClass}>
