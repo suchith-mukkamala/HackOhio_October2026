@@ -52,6 +52,32 @@ function RequestCard({ r, onAnswered, highlighted = false }: { r: HelpRequest; o
   )
 }
 
+type Impact = { answered: number; students_helped: number; marked_helpful: number; skills_endorsed: number }
+
+// How much you've helped so far. "Waiting" comes from the inbox below, the rest from /help/impact.
+function ImpactStrip({ waiting }: { waiting?: number }) {
+  const impact = useQuery({ queryKey: ['impact'], queryFn: () => api<Impact>('/help/impact') })
+  const tiles = [
+    { label: 'Waiting for you', value: waiting, highlight: (waiting ?? 0) > 0 },
+    { label: 'Students helped', value: impact.data?.students_helped },
+    { label: 'Marked helpful', value: impact.data?.marked_helpful },
+    { label: 'Skills endorsed', value: impact.data?.skills_endorsed },
+  ]
+  return (
+    <section aria-label="Your impact" className="flex flex-col gap-3">
+      <h2 className="font-mono text-sm text-muted">{'// your impact'}</h2>
+      <ul className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {tiles.map((t) => (
+          <li key={t.label} className="rounded-2xl border border-edge bg-card p-4">
+            <span className={`block text-2xl font-semibold ${t.highlight ? 'text-accent' : ''}`}>{t.value ?? '–'}</span>
+            <span className="mt-1 block text-xs text-muted">{t.label}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 const TIMES = [5, 15, 30] as const
 
 const chip = (on: boolean) =>
@@ -76,51 +102,54 @@ export default function MentorInbox() {
   const requests = [...shown].sort((a, b) => Number(b.id === requestedId) - Number(a.id === requestedId))
 
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="font-mono text-sm text-muted">{'// help requests for you'}</h2>
-      {all.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <button aria-pressed={minutes === null} onClick={() => setMinutes(null)} className={chip(minutes === null)}>
-            Any time
-          </button>
-          {TIMES.map((m) => (
-            <button key={m} aria-pressed={minutes === m} onClick={() => setMinutes(m)} className={chip(minutes === m)}>
-              {m} min
+    <div className="flex flex-col gap-8">
+      <ImpactStrip waiting={inbox.data?.length} />
+      <section className="flex flex-col gap-3">
+        <h2 className="font-mono text-sm text-muted">{'// help requests for you'}</h2>
+        {all.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button aria-pressed={minutes === null} onClick={() => setMinutes(null)} className={chip(minutes === null)}>
+              Any time
             </button>
+            {TIMES.map((m) => (
+              <button key={m} aria-pressed={minutes === m} onClick={() => setMinutes(m)} className={chip(minutes === m)}>
+                {m} min
+              </button>
+            ))}
+            {skills.length > 0 && (
+              <select
+                id="filter-skill"
+                aria-label="Filter by skill"
+                value={activeSkill}
+                onChange={(e) => setSkill(e.target.value)}
+                className="rounded-lg bg-tile px-2 py-1.5 text-xs"
+              >
+                <option value="">All skills</option>
+                {skills.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            )}
+            {filtering && (
+              <button onClick={() => { setMinutes(null); setSkill('') }} className="text-xs text-accent hover:underline">
+                Clear filters
+              </button>
+            )}
+            <span className="ml-auto font-mono text-xs text-muted">
+              {requests.length} of {all.length}
+            </span>
+          </div>
+        )}
+        {inbox.data?.length === 0 && <p className="text-sm text-muted">No open requests right now.</p>}
+        {all.length > 0 && requests.length === 0 && <p className="text-sm text-muted">No requests match these filters.</p>}
+        <ul className="flex flex-col gap-3">
+          {requests.map((r) => (
+            <RequestCard key={r.id} r={r} highlighted={r.id === requestedId} onAnswered={() => { void qc.invalidateQueries({ queryKey: ['inbox'] }); void qc.invalidateQueries({ queryKey: ['impact'] }); void qc.invalidateQueries({ queryKey: ['home-sidebar'] }) }} />
           ))}
-          {skills.length > 0 && (
-            <select
-              id="filter-skill"
-              aria-label="Filter by skill"
-              value={activeSkill}
-              onChange={(e) => setSkill(e.target.value)}
-              className="rounded-lg bg-tile px-2 py-1.5 text-xs"
-            >
-              <option value="">All skills</option>
-              {skills.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          )}
-          {filtering && (
-            <button onClick={() => { setMinutes(null); setSkill('') }} className="text-xs text-accent hover:underline">
-              Clear filters
-            </button>
-          )}
-          <span className="ml-auto font-mono text-xs text-muted">
-            {requests.length} of {all.length}
-          </span>
-        </div>
-      )}
-      {inbox.data?.length === 0 && <p className="text-sm text-muted">No open requests right now.</p>}
-      {all.length > 0 && requests.length === 0 && <p className="text-sm text-muted">No requests match these filters.</p>}
-      <ul className="flex flex-col gap-3">
-        {requests.map((r) => (
-          <RequestCard key={r.id} r={r} highlighted={r.id === requestedId} onAnswered={() => { void qc.invalidateQueries({ queryKey: ['inbox'] }); void qc.invalidateQueries({ queryKey: ['home-sidebar'] }) }} />
-        ))}
-      </ul>
-    </section>
+        </ul>
+      </section>
+    </div>
   )
 }
