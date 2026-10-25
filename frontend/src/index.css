@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+/* Light palette for the sign-in page; the app uses the Flash dashboard palette (navy-gray, blue accent).
+   The four evidence colors at the bottom get cooler as the evidence gets stronger. */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -41,49 +43,9 @@ body {
   background-attachment: fixed;
 }
 
-/* Custom leaf-shaped class (safe alternative to global rounded-2xl override) */
-.rounded-leaf {
+/* Leaf-shaped cards: two big rounded corners, two small ones */
+.rounded-2xl {
   border-radius: 2rem 0.6rem 2rem 0.6rem;
 }
 
-@layer utilities {
-  /* Fluid organic shapes for cards and containers */
-  .organic-card-1 {
-    border-radius: 40% 60% 60% 40% / 60% 30% 70% 40%;
-    transition: border-radius 0.6s ease-in-out, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  .organic-card-1:hover {
-    border-radius: 55% 45% 38% 62% / 52% 58% 42% 48%;
-  }
 
-  .organic-card-2 {
-    border-radius: 60% 40% 30% 70% / 50% 60% 40% 50%;
-    transition: border-radius 0.6s ease-in-out;
-  }
-
-  /* Frosted glassmorphism */
-  .glass-organic {
-    background: rgba(20, 30, 25, 0.65);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
-}
-
-/* Ambient background floating light animation */
-@keyframes float {
-  0%, 100% {
-    transform: translate(0px, 0px) scale(1);
-  }
-  50% {
-    transform: translate(35px, -45px) scale(1.12);
-  }
-}
-
-.animate-float-slow {
-  animation: float 9s ease-in-out infinite;
-}
-
-.animate-float-delayed {
-  animation: float 11s ease-in-out 3s infinite;
-}
