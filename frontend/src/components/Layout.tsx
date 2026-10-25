@@ -56,9 +56,9 @@ export default function Layout() {
             onClick={event => onLinkClick(event, '/feed')}
             title="Home"
             aria-label="Home"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent font-bold text-white"
+            className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl transition-opacity hover:opacity-85"
           >
-            K
+            <img src="/keystone-icon.svg" alt="Keystone" width={40} height={40} className="block h-10 w-10" />
           </NavLink>
 
           <form
