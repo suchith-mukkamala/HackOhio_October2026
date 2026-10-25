@@ -81,6 +81,23 @@ function UserList({ meId }: { meId: number }) {
     }
   }
 
+    async function setBan(u: User, ban: boolean, deleteContent = false) {
+    const question = ban
+      ? deleteContent
+        ? `Ban ${u.name} and delete every post and comment they wrote?`
+        : `Ban ${u.name}? They will be signed out and blocked.`
+      : `Let ${u.name} back in?`
+    if (!window.confirm(question)) return
+    try {
+      await post(`/admin/users/${u.id}/${ban ? 'ban' : 'unban'}`, ban ? { delete_content: deleteContent } : undefined)
+      setError('')
+      await qc.invalidateQueries({ queryKey: ['admin-users'] })
+      await qc.invalidateQueries({ queryKey: ['feed'] })
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not update that account.')
+    }
+  }
+
   return (
     <section>
       <h1 className="text-lg font-semibold">Admin</h1>
