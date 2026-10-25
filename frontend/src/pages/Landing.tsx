@@ -5,12 +5,13 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Github } from 'lucide-react'
 import { ApiError, post } from '../lib/api'
 
-const sparkConfig = Array.from({ length: 18 }, (_, index) => ({
-  left: `${(index * 11 + 6) % 100}%`,
-  duration: `${16 + (index % 6) * 3}s`,
-  delay: `${(index * 0.9).toFixed(1)}s`,
-  size: `${5 + (index % 4) * 2}px`,
-  opacity: 0.18 + (index % 5) * 0.08,
+const sparkConfig = Array.from({ length: 28 }, (_, index) => ({
+  left: `${(index * 11 + (index % 5) * 9) % 100}%`,
+  duration: `${18 + (index % 7) * 4}s`,
+  delay: `${(index * 0.9 + (index % 4) * 0.5).toFixed(2)}s`,
+  size: `${2 + (index % 3)}px`,
+  opacity: 0.8 + (index % 4) * 0.08,
+  sway: `${-18 + (index % 9) * 4}px`,
 }))
 
 // Sign-in page; with `register` it becomes the create-account page at /register
@@ -46,10 +47,11 @@ export default function Landing({ register = false }: { register?: boolean }) {
             style={{
               left: spark.left,
               width: spark.size,
-              height: `${Number.parseFloat(spark.size) * 2.2}px`,
+              height: spark.size,
               opacity: spark.opacity,
               animationDuration: spark.duration,
               animationDelay: spark.delay,
+              ['--sway' as any]: spark.sway,
             }}
           />
         ))}
