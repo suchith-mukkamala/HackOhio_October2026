@@ -204,3 +204,21 @@ class Club(SQLModel, table=True):
 class ClubMember(SQLModel, table=True):
     club_id: int = Field(foreign_key="club.id", primary_key=True)
     user_id: int = Field(foreign_key="user.id", primary_key=True)
+
+
+class Challenge(SQLModel, table=True):
+    """A timed solo build on a random prompt (24 hours by default), judged by a mentor."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    prompt: str
+    hours: int = 24
+    started_at: datetime = Field(default_factory=now)
+    ends_at: datetime
+    writeup: str = ""
+    link: str = ""
+    submitted_at: Optional[datetime] = None
+    post_id: Optional[int] = Field(default=None, foreign_key="post.id")  # shared to the feed on submit
+    judge_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    score: Optional[int] = None  # 1-10
+    feedback: str = ""

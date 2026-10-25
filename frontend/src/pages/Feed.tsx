@@ -183,7 +183,7 @@ export default function Feed() {
       {me && (
         <div className="sticky top-20 hidden flex-col gap-4 md:flex">
           <Link to={`/u/${me.id}`} className="overflow-hidden rounded-2xl border border-edge bg-card text-center">
-            <div className="h-14 bg-gradient-to-r from-brand via-accent to-avatar" />
+            <div className="h-14 bg-accent" />
             <span className="-mt-8 inline-block rounded-full ring-4 ring-card">
               <Avatar user={me} size={64} />
             </span>

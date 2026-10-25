@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import Landing from './pages/Landing'
 import Home from './pages/Home'
+import Challenges from './pages/Challenges'
 import Explore from './pages/Explore'
 import NewProject from './pages/NewProject'
 import ProjectPage from './pages/ProjectPage'
@@ -18,6 +19,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/feed" element={<Home />} />
         <Route path="/explore" element={<Explore />} />
+        <Route path="/challenges" element={<Challenges />} />
         <Route path="/projects/new" element={<NewProject />} />
         <Route path="/projects/:id" element={<ProjectPage />} />
         <Route path="/u/:id" element={<Profile />} />
