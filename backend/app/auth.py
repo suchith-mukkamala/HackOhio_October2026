@@ -47,6 +47,8 @@ def current_user(request: Request, session: Session = Depends(get_session)) -> U
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(401, "User no longer exists")
+    if user.is_banned:
+        raise HTTPException(403, "This account has been suspended")
     return user
 
 
