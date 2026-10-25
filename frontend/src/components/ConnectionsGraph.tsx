@@ -82,24 +82,30 @@ export default function ConnectionsGraph({ users, interconnections = [] }: { use
     const scale = 600 / (600 - depth)
     return { x: rx * scale, y: ry * scale, depth, scale }
   }
-  // A Fibonacci sphere gives each connection a real 3D position around the origin.
-  const placed = users.map((user, index) => {
-    const y = users.length === 1 ? 0 : 1 - 2 * (index + .5) / users.length
+  // Distribute people across concentric 3D shells, rather than one outer surface.
+  const layerCount = Math.min(3, users.length)
+  const radii = layerCount === 3 ? [78, 120, 162] : layerCount === 2 ? [96, 162] : [145]
+  const placed = [...users].sort((a, b) => a.id - b.id).map((user, index) => {
+    const layer = index % layerCount
+    const localIndex = Math.floor(index / layerCount)
+    const count = Math.ceil((users.length - layer) / layerCount)
+    const y = count === 1 ? 0 : 1 - 2 * (localIndex + .5) / count
     const radius = Math.sqrt(1 - y * y)
-    const angle = index * GOLDEN_ANGLE
-    return { user, index, ...project(145 * Math.cos(angle) * radius, 145 * y, 145 * Math.sin(angle) * radius) }
+    const angle = localIndex * GOLDEN_ANGLE + layer * GOLDEN_ANGLE / 2
+    const distance = radii[layer]
+    return { user, layer, ...project(distance * Math.cos(angle) * radius, distance * y, distance * Math.sin(angle) * radius) }
   }).sort((a, b) => a.depth - b.depth)
   const byId = new Map(placed.map(node => [node.user.id, node]))
-  const orbit = (axis: number) => Array.from({ length: 65 }, (_, index) => {
+  const orbit = (axis: number, radius: number) => Array.from({ length: 65 }, (_, index) => {
     const angle = index / 64 * 2 * Math.PI
-    const a = 145 * Math.cos(angle), b = 145 * Math.sin(angle)
+    const a = radius * Math.cos(angle), b = radius * Math.sin(angle)
     const point = axis === 0 ? project(a, b, 0) : axis === 1 ? project(a, 0, b) : project(0, a, b)
     return `${index ? 'L' : 'M'}${point.x},${point.y}`
   }).join(' ') + ' Z'
-  const node = ({ user, x, y, depth, scale }: typeof placed[number]) => <a key={user.id} data-role={user.role} data-depth={depth.toFixed(2)} href={`/u/${user.id}`} aria-label={`Open ${user.name} profile`} className="outline-none focus-visible:[&_circle]:stroke-white focus-visible:[&_rect]:stroke-white focus-visible:[&_path]:stroke-white"><title>{user.name}</title><g transform={`translate(${x} ${y}) scale(${scale})`}><circle r={23} fill="transparent" /><Marker role={user.role} x={0} y={0} /></g></a>
+  const node = ({ user, layer, x, y, depth, scale }: typeof placed[number]) => <a key={user.id} data-role={user.role} data-layer={layer + 1} data-depth={depth.toFixed(2)} href={`/u/${user.id}`} aria-label={`Open ${user.name} profile`} className="outline-none focus-visible:[&_circle]:stroke-white focus-visible:[&_rect]:stroke-white focus-visible:[&_path]:stroke-white"><title>{user.name}</title><g transform={`translate(${x} ${y}) scale(${scale})`}><circle r={23} fill="transparent" /><Marker role={user.role} x={0} y={0} /></g></a>
   return <div className="min-w-0 rounded-2xl border border-edge bg-card p-4">
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">Your connections graph</h2><span className="text-xs text-muted">Accepted connections only</span></div>
-    <svg ref={svgRef} onPointerEnter={() => { hovered.current = true }} onPointerLeave={() => { hovered.current = false }} onFocusCapture={() => { focused.current = true }} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) focused.current = false }} viewBox="-210 -210 420 420" className="mx-auto h-[320px] w-full touch-pan-y select-none cursor-grab active:cursor-grabbing sm:h-[380px] focus-visible:outline-2 focus-visible:outline-accent" tabIndex={0} aria-label={`Connections graph with ${users.length} connections. Circles are students, diamonds are mentors, squares are faculty.`} aria-describedby="connections-rotate-help" onPointerDown={startDrag} onPointerMove={rotate} onPointerUp={stopDrag} onPointerCancel={stopDrag} onLostPointerCapture={() => { drag.current = null }} onClickCapture={event => { if (dragged.current && event.detail !== 0) { event.preventDefault(); event.stopPropagation(); dragged.current = false } }} onDoubleClick={() => setRotation(initialRotation)} onKeyDown={event => {
+    <svg ref={svgRef} onPointerEnter={() => { hovered.current = true }} onPointerLeave={() => { hovered.current = false }} onFocusCapture={() => { focused.current = true }} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) focused.current = false }} viewBox="-210 -210 420 420" className="mx-auto h-[320px] w-full touch-pan-y select-none cursor-grab active:cursor-grabbing sm:h-[380px] focus-visible:outline-2 focus-visible:outline-accent" tabIndex={0} aria-label={`Connections graph with ${users.length} connections. ${layerCount} depth layers. Circles are students, diamonds are mentors, squares are faculty.`} aria-describedby="connections-rotate-help" onPointerDown={startDrag} onPointerMove={rotate} onPointerUp={stopDrag} onPointerCancel={stopDrag} onLostPointerCapture={() => { drag.current = null }} onClickCapture={event => { if (dragged.current && event.detail !== 0) { event.preventDefault(); event.stopPropagation(); dragged.current = false } }} onDoubleClick={() => setRotation(initialRotation)} onKeyDown={event => {
       if (event.target !== event.currentTarget) return
       if (event.key === 'Home') { event.preventDefault(); setRotation(initialRotation); return }
       if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return
@@ -108,7 +114,7 @@ export default function ConnectionsGraph({ users, interconnections = [] }: { use
     }}>
       <defs><radialGradient id={glowId}><stop stopColor="var(--color-accent)" stopOpacity=".09" /><stop offset="1" stopColor="var(--color-accent)" stopOpacity="0" /></radialGradient></defs>
       <circle r={195} fill={`url(#${glowId})`} pointerEvents="none" />
-      <g fill="none" stroke="var(--color-muted)" strokeOpacity={.1} pointerEvents="none">{[0, 1, 2].map(axis => <path key={axis} d={orbit(axis)} />)}</g>
+      <g fill="none" stroke="var(--color-muted)" strokeOpacity={.075} pointerEvents="none">{radii.slice(0, layerCount).map((radius, layer) => <g key={layer} data-layer-guide={layer + 1}>{[0, 1, 2].map(axis => <path key={axis} d={orbit(axis, radius)} />)}</g>)}</g>
       <g aria-hidden="true" data-interconnections="true" stroke="var(--color-accent)" strokeOpacity={.13} strokeWidth={1} pointerEvents="none">
         {interconnections.map(({ source, target }) => {
           const from = byId.get(source), to = byId.get(target)

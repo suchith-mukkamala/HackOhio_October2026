@@ -92,6 +92,8 @@ with sync_playwright() as p:
     graph=sender.get_by_label('Connections graph with 3 connections.',exact=False)
     graph.wait_for()
     assert graph.locator('a').count()==3
+    assert set(graph.locator('a[data-layer]').evaluate_all('(nodes)=>nodes.map(n=>n.dataset.layer)'))=={'1','2','3'}
+    assert graph.locator('[data-layer-guide]').count()==3
     assert graph.locator('[data-interconnections] line').count()==1
     assert graph.locator('a[data-role="student"] circle').count()==2
     assert graph.locator('a[data-role="mentor"] path').count()==1
