@@ -6,7 +6,7 @@ import './Feed.css'
 import HomeSidebar from '../components/HomeSidebar'
 import { Ladder, OrgsCard } from '../components/Community'
 import Avatar from '../components/Avatar'
-import { api, post } from '../lib/api'
+import { api, del, post } from '../lib/api'
 import { headline, useMe } from '../lib/auth'
 import type { FeedItem, LogEntry } from '../lib/types'
 
@@ -114,6 +114,21 @@ export function LogBody({ log, canAsk }: { log: LogEntry; canAsk: boolean }) {
 export function PostCard({ item, meId, onChange }: { item: FeedItem; meId?: number; onChange: () => void }) {
   const [comment, setComment] = useState('')
   const { post: p, author, project, log, comments } = item
+
+    const { data: viewer } = useMe()
+    const isAdmin = !!viewer?.is_admin
+
+    async function removePost() {
+      if (!window.confirm('Delete this post and its comments?')) return
+      await del(`/admin/posts/${p.id}`)
+      onChange()
+    }
+
+    async function removeComment(id: number) {
+      if (!window.confirm('Delete this comment?')) return
+      await del(`/admin/comments/${id}`)
+      onChange()
+    }
 
   async function sendComment() {
     if (!comment.trim()) return
