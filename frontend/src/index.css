@@ -49,3 +49,44 @@ body {
 .bg-accent {
   background-image: linear-gradient(135deg, #4f7cff, #7c5cff);
 }
+
+
+/* Leaf-shaped cards: two big rounded corners, two small ones */
+.rounded-2xl {
+  border-radius: 2rem 0.6rem 2rem 0.6rem;
+}
+
+/* The blobs below replace the orbit rings and glows */
+body {
+  background-image: none;
+}
+
+/* Two big soft shapes behind everything. Fixed, so they stay put as you scroll. */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  filter: blur(60px);
+}
+
+body::before {
+  width: 34rem;
+  height: 30rem;
+  top: -8rem;
+  left: -10rem;
+  background: #4f7cff;
+  opacity: 0.16;
+  border-radius: 63% 37% 54% 46% / 55% 48% 52% 45%;
+}
+
+body::after {
+  width: 30rem;
+  height: 28rem;
+  right: -9rem;
+  bottom: -8rem;
+  background: #2fd4a0;
+  opacity: 0.1;
+  border-radius: 40% 60% 38% 62% / 52% 40% 60% 48%;
+}
