@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, MessageSquare, Plus, Send } from 'lucide-react'
 import Avatar from '../components/Avatar'
+import ProjectInvitationInbox from '../components/ProjectInvitationInbox'
 import FollowRequestNotice from '../components/FollowRequestNotice'
 import { api, post } from '../lib/api'
 import { headline, useMe } from '../lib/auth'
@@ -61,6 +62,7 @@ function Inbox({ me }: { me: User }) {
   const draft = selectedId ? drafts[selectedId] ?? '' : ''
 
   return <div className="mx-auto max-w-6xl">
+    <ProjectInvitationInbox userId={me.id} />
     <header className="mb-6 flex items-center justify-between gap-3"><div><h1 className="text-2xl font-semibold">Messages</h1><p className="mt-2 text-sm text-muted">Talk with teammates and mentors, individually or as a group.</p></div><button className={buttonClass} onClick={() => { setCreating(true); create.reset(); setRecipients([]) }}><Plus size={17} /> New conversation</button></header>
     {creating && <section aria-label="New conversation" className="mb-5 rounded-2xl border border-edge bg-card p-5">
       <h2 className="mb-2 font-semibold">New conversation</h2><p className="mb-4 text-sm text-muted">Select one person for a direct conversation, or several for a group.</p>

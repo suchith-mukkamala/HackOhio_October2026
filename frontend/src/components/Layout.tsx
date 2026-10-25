@@ -6,7 +6,7 @@ import Avatar from './Avatar'
 import { api, post } from '../lib/api'
 import { usePageNavigation } from '../lib/usePageNavigation'
 import { useMe } from '../lib/auth'
-import type { ConnectionsData, HelpRequest } from '../lib/types'
+import type { ConnectionsData, HelpRequest, ReceivedProjectInvite } from '../lib/types'
 
 // Icon-only navigation, underlined when active.
 const tabClass = ({ isActive }: { isActive: boolean }) =>
@@ -40,6 +40,8 @@ export default function Layout() {
   // Same query as the Help inbox page, so the badge and the page share one request and update together
   const inbox = useQuery({ queryKey: ['inbox'], queryFn: () => api<HelpRequest[]>('/help/inbox'), enabled: isMentor, refetchInterval: 60_000 })
   const openRequests = inbox.data?.length ?? 0
+  const projectInvites = useQuery({ queryKey: ['project-invites', me?.id], queryFn: () => api<ReceivedProjectInvite[]>('/project-invites'), enabled: Boolean(me), refetchInterval: 5000 })
+  const pendingProjectInvites = projectInvites.data?.filter(invite => invite.status === 'pending').length ?? 0
   const connections = useQuery({ queryKey: ['connections', me?.id], queryFn: () => api<ConnectionsData>('/connections'), enabled: Boolean(me), refetchInterval: 5000 })
   const followRequests = connections.data?.requests.filter(request => request.recipient_id === me?.id && request.status === 'pending').length ?? 0
 
@@ -78,7 +80,7 @@ export default function Layout() {
             <Tab to="/explore" icon={Compass} label="Explore" />
             <Tab to="/showcase" icon={Award} label="Showcase" />
             <Tab to="/challenges" icon={Trophy} label="Challenges" />
-            <Tab to="/messages" icon={MessageSquare} label="Messages" />
+            <Tab to="/messages" icon={MessageSquare} label="Messages" badge={pendingProjectInvites} />
             <Tab to="/connections" icon={UsersRound} label="Connections" badge={followRequests} />
             {isMentor ? <Tab to="/mentor" icon={Inbox} label="Help inbox" badge={openRequests} /> : <Tab to="/projects/new" icon={Plus} label="Project" />}
             {me?.is_admin && <Tab to="/admin" icon={Shield} label="Admin" />}

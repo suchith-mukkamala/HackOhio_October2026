@@ -19,7 +19,7 @@ from ..models import (
     User,
 )
 from ..services import ai, github
-from ..services.profile_settings import public_user
+from ..services.profile_settings import may_contact, public_user
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -182,8 +182,10 @@ def invite(project_id: int, to_id: int, user: User = Depends(current_user), sess
         raise HTTPException(400, "You can't invite yourself")
     if not session.get(User, to_id):
         raise HTTPException(404, "User not found")
-    if session.get(ProjectMember, (project_id, to_id)):
+    if to_id in project_participants(session, get_project(session, project_id)):
         raise HTTPException(409, "They're already on this project")
+    if not may_contact(session, user.id, to_id, True):
+        raise HTTPException(403, "This person's group invitation preferences do not allow this invitation")
     pending = session.exec(
         select(Invite).where(Invite.project_id == project_id, Invite.to_id == to_id, Invite.status == "pending")
     ).first()
@@ -194,6 +196,13 @@ def invite(project_id: int, to_id: int, user: User = Depends(current_user), sess
     session.commit()
     session.refresh(inv)
     return inv
+
+
+@router.get('/{project_id}/invites')
+def project_invites(project_id: int, user: User = Depends(current_user), session: Session = Depends(get_session)):
+    require_member(session, project_id, user)
+    rows = session.exec(select(Invite).where(Invite.project_id == project_id).order_by(Invite.created_at.desc(), Invite.id.desc())).all()
+    return [dict(**row.model_dump(mode='json'), recipient=public_user(session, session.get(User, row.to_id), user)) for row in rows if session.get(User, row.to_id)]
 
 
 @router.post("/{project_id}/archive", response_model=Project)

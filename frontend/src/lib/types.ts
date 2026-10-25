@@ -51,6 +51,16 @@ export interface LogEntry {
 
 export type MediaKind = 'image' | 'video' | 'youtube'
 
+export interface ProjectInvite {
+  id: number
+  project_id: number
+  from_id: number
+  to_id: number
+  status: 'pending' | 'accepted' | 'declined'
+  created_at: string
+}
+export interface ReceivedProjectInvite extends ProjectInvite { project: Project; sender: User }
+
 export interface FollowRequest {
   id: number
   sender_id: number

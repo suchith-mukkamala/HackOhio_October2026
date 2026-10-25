@@ -4,6 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Github, Sparkles } from 'lucide-react'
 import NewProject from './NewProject'
 import Avatar from '../components/Avatar'
+import ProjectInvitePanel from '../components/ProjectInvitePanel'
+import ProjectInvitationInbox from '../components/ProjectInvitationInbox'
 import { LogBody } from './Feed'
 import { ApiError, api, post } from '../lib/api'
 import { useMe } from '../lib/auth'
@@ -110,6 +112,7 @@ export default function ProjectPage() {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const [editing, setEditing] = useState(false)
+  const [inviting, setInviting] = useState(false)
   const [completionAction, setCompletionAction] = useState<'archive' | 'reopen' | null>(null)
   const [completionError, setCompletionError] = useState('')
   const [completing, setCompleting] = useState(false)
@@ -125,7 +128,7 @@ export default function ProjectPage() {
   const [logError, setLogError] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [comment, setComment] = useState('')
-  const q = useQuery({ queryKey: ['project', id], queryFn: () => api<ProjectData>(`/projects/${id}`) })
+  const q = useQuery({ queryKey: ['project', id], queryFn: () => api<ProjectData>(`/projects/${id}`), refetchInterval: inviting ? 5000 : false })
   const refresh = () => qc.invalidateQueries({ queryKey: ['project', id] })
 
   if (!q.data) return <p className="text-muted">{q.isError ? 'Project not found.' : 'Loading…'}</p>
@@ -182,6 +185,9 @@ export default function ProjectPage() {
 
   return (
     <div className="flex flex-col gap-8">
+      {me && <ProjectInvitationInbox userId={me.id} projectId={p.id} />}
+      {isMember && p.status === 'active' && <button onClick={() => setInviting(previous => !previous)} aria-expanded={inviting} className="w-fit rounded-lg border border-accent/50 bg-accent-soft px-4 py-2 text-sm font-semibold text-accent">{inviting ? 'Close invitations' : 'Invite people'}</button>}
+      {inviting && isMember && p.status === 'active' && me && <ProjectInvitePanel projectId={p.id} viewerId={me.id} memberIds={[p.owner_id, ...members.map(member => member.user.id)]} onClose={() => setInviting(false)} />}
       {isMember && <div className="flex flex-wrap gap-3"><button onClick={() => setEditing(true)} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white">Edit project</button><button onClick={() => { setAction(isGroup ? 'leave' : 'delete'); setActionError('') }} className="rounded-lg border border-edge px-4 py-2 text-sm">{isGroup ? 'Leave project' : 'Delete project'}</button></div>}
       {p.owner_id === me?.id && <button onClick={() => { setCompletionAction(p.status === 'active' ? 'archive' : 'reopen'); setCompletionError('') }} className="w-fit rounded-lg border border-accent/50 bg-accent-soft px-4 py-2 text-sm font-semibold text-accent">{p.status === 'active' ? 'Mark complete & showcase' : 'Reopen project'}</button>}
       {completionAction && p.owner_id === me?.id && <section aria-label="Confirm project completion" className="rounded-xl border border-edge bg-card p-5"><h2 className="font-semibold">{completionAction === 'archive' ? 'Complete and showcase this project?' : 'Reopen this project?'}</h2><p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">{completionAction === 'archive' ? 'The project will be archived and listed in the public showcase. Your team, repository, and published weekly logs will remain visible at the same shareable link. New logs, invitations, and help requests pause until you reopen it.' : 'The project will return to active projects and leave the completed showcase. Your team and history will stay intact.'}</p>{completionError && <p role="alert" className="mt-3 text-sm text-warn">{completionError}</p>}<div className="mt-4 flex gap-3"><button disabled={completing} onClick={() => void changeCompletion()} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{completing ? 'Saving...' : completionAction === 'archive' ? 'Complete & publish to showcase' : 'Confirm reopen'}</button><button disabled={completing} onClick={() => setCompletionAction(null)} className="px-3 py-2 text-sm">Cancel</button></div></section>}
