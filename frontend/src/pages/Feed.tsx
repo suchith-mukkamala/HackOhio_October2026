@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { PointerEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CircleCheck, CircleHelp, ImagePlus, Lightbulb, Link2, Send, Trash2, X } from 'lucide-react'
@@ -179,6 +180,24 @@ export function PostCard({ item, meId, onChange }: { item: FeedItem; meId?: numb
   const { data: me } = useMe()
   const canDelete = (authorId: number) => me?.id === authorId || !!me?.is_admin
 
+  function resetTilt(event: PointerEvent<HTMLDivElement>) {
+    event.currentTarget.style.removeProperty('--card-rotate-x')
+    event.currentTarget.style.removeProperty('--card-rotate-y')
+    event.currentTarget.removeAttribute('data-tilting')
+  }
+
+  function tiltCard(event: PointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== 'mouse' || !window.matchMedia('(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)').matches) return
+    const card = event.currentTarget
+    // Measure the stationary wrapper so tilting never shifts the pointer's reference frame.
+    const bounds = card.getBoundingClientRect()
+    const x = Math.max(-1, Math.min(1, (event.clientX - bounds.left) / bounds.width * 2 - 1))
+    const y = Math.max(-1, Math.min(1, (event.clientY - bounds.top) / bounds.height * 2 - 1))
+    card.style.setProperty('--card-rotate-x', `${-y * 1.6}deg`)
+    card.style.setProperty('--card-rotate-y', `${x * 1.6}deg`)
+    card.dataset.tilting = 'true'
+  }
+
   async function remove(path: string, what: string) {
     if (!window.confirm(`Delete this ${what}?`)) return
     await api(path, { method: 'DELETE' })
@@ -193,7 +212,8 @@ export function PostCard({ item, meId, onChange }: { item: FeedItem; meId?: numb
   }
 
   return (
-    <article className="rounded-2xl border border-edge bg-card p-5">
+    <div className="feed-card-stage" onPointerMove={tiltCard} onPointerLeave={resetTilt} onPointerCancel={resetTilt}>
+    <article className="feed-card-surface rounded-2xl border border-edge bg-card p-5">
       <header className="flex items-center gap-3">
         {author && <Avatar user={author} />}
         <div className="min-w-0 flex-1">
@@ -254,6 +274,7 @@ export function PostCard({ item, meId, onChange }: { item: FeedItem; meId?: numb
         </div>
       </footer>
     </article>
+    </div>
   )
 }
 

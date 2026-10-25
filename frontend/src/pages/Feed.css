@@ -3,6 +3,20 @@
 .home-sidebar { width: 100%; min-width: 0; overflow-wrap: anywhere; }
 .home-sidebar svg { flex-shrink: 0; }
 
+.feed-card-stage { min-width: 0; perspective: 1200px; }
+.feed-card-surface {
+  box-shadow: 0 3px 8px rgb(0 0 0 / .08), 0 12px 28px -20px rgb(0 0 0 / .3);
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .feed-card-surface {
+    transform: rotateX(var(--card-rotate-x, 0deg)) rotateY(var(--card-rotate-y, 0deg));
+    transition: transform 180ms ease-out, box-shadow 220ms ease-out;
+  }
+  .feed-card-stage[data-tilting] > .feed-card-surface {
+    box-shadow: 0 5px 12px rgb(0 0 0 / .1), 0 18px 34px -20px rgb(0 0 0 / .38);
+  }
+}
+
 @media (min-width: 1024px) {
   /* The sticky rail stays below the navigation and above the viewport bottom. */
   .home-sidebar-shell {
