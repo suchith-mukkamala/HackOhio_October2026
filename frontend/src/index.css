@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Light palette for the sign-in page, cool dark palette for the app.
+/* Light palette for the sign-in page; the app uses the Flash dashboard palette (navy-gray, blue accent).
    The four evidence colors at the bottom get cooler as the evidence gets stronger. */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -15,17 +15,17 @@
   --color-blob: #dfe7fb;
   --color-blob-2: #e7e3f6;
 
-  --color-base: #0a1124;
-  --color-panel: #101a33;
-  --color-card: #15213f;
-  --color-tile: #1f2d52;
-  --color-edge: #2c3d6b;
-  --color-ink: #e8eefc;
-  --color-muted: #9fb0d6;
-  --color-accent: #4f7cff;
-  --color-accent-soft: #1c2b5e;
-  --color-good: #34d3a4;
-  --color-good-soft: #0f3a33;
+  --color-base: #0f1521;
+  --color-panel: #161e2b;
+  --color-card: #1a2332;
+  --color-tile: #222c3d;
+  --color-edge: #273246;
+  --color-ink: #e6eaf0;
+  --color-muted: #9aa4b5;
+  --color-accent: #4f8cff;
+  --color-accent-soft: #1f2a40;
+  --color-good: #22c55e;
+  --color-good-soft: #12331f;
   --color-warn: #f59e0b;
   --color-avatar: #7c6cf6;
 
@@ -37,52 +37,15 @@
 
 body {
   @apply bg-base font-sans text-ink antialiased;
-  /* A blue glow top-left, a teal glow bottom-right, and faint orbit rings from the top-right */
+  /* Faint orbit lines from the top-right, on a solid near-black background */
   background-image:
-    radial-gradient(60rem 36rem at 6% -10%, rgb(79 124 255 / 0.2), transparent 65%),
-    radial-gradient(48rem 30rem at 100% 100%, rgb(47 212 160 / 0.09), transparent 60%),
     repeating-radial-gradient(circle at 92% 6%, transparent 0 7rem, rgb(143 155 199 / 0.07) 7rem calc(7rem + 1px));
   background-attachment: fixed;
-}
-
-/* Blue-to-violet gradient on every solid accent surface (buttons, the logo tile) */
-.bg-accent {
-  background-image: linear-gradient(135deg, #4f7cff, #7c5cff);
 }
 
 /* Leaf-shaped cards: two big rounded corners, two small ones */
 .rounded-2xl {
   border-radius: 2rem 0.6rem 2rem 0.6rem;
-}
-
-/* Two big soft shapes behind everything. Fixed, so they stay put as you scroll. */
-body::before,
-body::after {
-  content: "";
-  position: fixed;
-  z-index: -1;
-  pointer-events: none;
-  filter: blur(60px);
-}
-
-body::before {
-  width: 34rem;
-  height: 30rem;
-  top: -8rem;
-  left: -10rem;
-  background: #4f7cff;
-  opacity: 0.16;
-  border-radius: 63% 37% 54% 46% / 55% 48% 52% 45%;
-}
-
-body::after {
-  width: 30rem;
-  height: 28rem;
-  right: -9rem;
-  bottom: -8rem;
-  background: #2fd4a0;
-  opacity: 0.1;
-  border-radius: 40% 60% 38% 62% / 52% 40% 60% 48%;
 }
 
 .landing-spark {
@@ -93,11 +56,14 @@ body::after {
   border-radius: 9999px;
   background: linear-gradient(
     180deg,
-    rgba(175, 210, 255, 0.9),
-    rgba(88, 137, 255, 0.7) 28%,
-    rgba(88, 137, 255, 0.12) 100%
+    rgba(166, 230, 188, 0.98),
+    rgba(72, 168, 120, 0.82) 28%,
+    rgba(17, 79, 54, 0.28) 100%
   );
-  box-shadow: 0 0 10px rgba(110, 165, 255, 0.55), 0 0 18px rgba(110, 165, 255, 0.2);
+  box-shadow:
+    0 0 12px rgba(88, 180, 122, 0.9),
+    0 0 20px rgba(47, 128, 85, 0.7),
+    0 0 32px rgba(22, 87, 58, 0.38);
   transform: translate3d(0, 0, 0);
   animation-name: landingSparkFall;
   animation-timing-function: linear;
@@ -109,19 +75,19 @@ body::after {
     opacity: 0;
     transform: translate3d(0, -15%, 0) scale(0.7);
   }
-  10% {
+  12% {
     opacity: 1;
   }
   30% {
     opacity: 0.9;
-    transform: translate3d(14px, 30vh, 0) scale(1);
+    transform: translate3d(18px, 28vh, 0) scale(1.15);
   }
-  70% {
-    opacity: 0.55;
-    transform: translate3d(-10px, 70vh, 0) scale(0.95);
+  62% {
+    opacity: 0.8;
+    transform: translate3d(-14px, 62vh, 0) scale(1.05);
   }
   100% {
     opacity: 0;
-    transform: translate3d(18px, 115vh, 0) scale(0.7);
+    transform: translate3d(22px, 118vh, 0) scale(0.8);
   }
 }
