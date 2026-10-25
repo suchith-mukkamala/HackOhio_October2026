@@ -70,7 +70,7 @@ function ImpactStrip({ waiting }: { waiting?: number }) {
         {tiles.map((t) => (
           <li key={t.label} className="rounded-2xl border border-edge bg-card p-4">
             <span className={`block text-2xl font-semibold ${t.highlight ? 'text-accent' : ''}`}>{t.value ?? '–'}</span>
-            <span className="mt-1 block text-xs text-muted">{t.label}</span>
+            <span className="mt-1 block text-xs text-muted" title={t.label === 'Students helped' ? 'Each answered request counts, including repeat help for the same student.' : undefined}>{t.label}</span>
           </li>
         ))}
       </ul>

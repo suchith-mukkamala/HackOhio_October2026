@@ -1,7 +1,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, SQLModel, select
+from sqlmodel import Session, SQLModel, func, select
 
 from ..auth import current_user
 from ..db import get_session
@@ -56,6 +56,30 @@ def inbox(user: User = Depends(current_user), session: Session = Depends(get_ses
     open_requests = session.exec(select(HelpRequest).where(HelpRequest.status == "open")).all()
     scored = [{**r.model_dump(), "match_score": match_score(r, user)} for r in open_requests]
     return sorted(scored, key=lambda r: r["match_score"], reverse=True)
+
+
+@router.get("/impact")
+def impact(user: User = Depends(current_user), session: Session = Depends(get_session)):
+    if user.role not in ("mentor", "faculty"):
+        raise HTTPException(403, "Impact statistics are for mentors and faculty")
+    answered = session.exec(
+        select(func.count()).select_from(HelpRequest).where(
+            HelpRequest.mentor_id == user.id,
+            HelpRequest.status.in_(("answered", "resolved")),
+        )
+    ).one()
+    marked_helpful = session.exec(
+        select(func.count()).select_from(HelpRequest).where(
+            HelpRequest.mentor_id == user.id,
+            HelpRequest.status.in_(("answered", "resolved")),
+            HelpRequest.helpful == True,
+        )
+    ).one()
+    endorsed = session.exec(
+        select(func.count()).select_from(Endorsement).where(Endorsement.from_id == user.id)
+    ).one()
+    # Count help provided, rather than distinct students, so repeat help also counts.
+    return {"answered": answered, "students_helped": answered, "marked_helpful": marked_helpful, "skills_endorsed": endorsed}
 
 
 @router.post("/{request_id}/answer", response_model=HelpRequest)
