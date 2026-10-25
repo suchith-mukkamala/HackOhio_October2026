@@ -32,6 +32,7 @@ class User(SQLModel, table=True):
 
     role: str = "student"  # student | mentor | faculty
     is_admin: bool = False  # set by redeeming ADMIN_CODE, see routers/admin.py
+    is_banned: bool = False  # set by an admin, see routers/admin.py
     name: str
     email: Optional[str] = Field(default=None, unique=True, index=True)
     major: Optional[str] = None
