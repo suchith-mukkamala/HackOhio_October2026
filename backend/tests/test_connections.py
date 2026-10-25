@@ -105,7 +105,7 @@ class ConnectionsTests(unittest.TestCase):
         self.actor = self.users[2]
         self.assertEqual(self.respond(request, 'denied').status_code, 403)
         self.assertEqual(self.client.get(f'/api/threads/{request["thread_id"]}/messages').status_code, 403)
-        self.assertEqual(self.client.get('/api/connections').json(), {'connections': [], 'requests': []})
+        self.assertEqual(self.client.get('/api/connections').json(), {'connections': [], 'requests': [], 'interconnections': []})
         self.assertEqual(self.client.get(f'/api/connections/users/{self.users[0].id}').json(), None)
 
     def test_reuses_direct_thread_never_group(self):
@@ -133,6 +133,27 @@ class ConnectionsTests(unittest.TestCase):
         for method, path, body in [('get', '/api/connections', None), ('get', '/api/connections/users/1', None), ('post', '/api/connections/users/1', None), ('post', '/api/connections/requests/1/respond', {'status': 'accepted'})]:
             response = getattr(self.client, method)(path, **({'json': body} if body else {}))
             self.assertEqual(response.status_code, 401, response.text)
+
+    def test_interconnections_only_include_accepted_visible_endpoints(self):
+        a, b, c = self.users
+        def connect(sender, recipient, status='accepted'):
+            self.actor = sender
+            request = self.client.post(f'/api/connections/users/{recipient.id}').json()
+            if status != 'pending':
+                self.actor = recipient
+                self.assertEqual(self.respond(request, status).status_code, 200)
+            return request
+        connect(a, b)
+        connect(b, c)
+        self.actor = a
+        self.assertEqual(self.client.get('/api/connections').json()['interconnections'], [])
+        request = connect(a, c, 'pending')
+        self.actor = a
+        self.assertEqual(self.client.get('/api/connections').json()['interconnections'], [])
+        self.actor = c
+        self.respond(request, 'accepted')
+        self.actor = a
+        self.assertEqual(self.client.get('/api/connections').json()['interconnections'], [{'source': min(b.id, c.id), 'target': max(b.id, c.id)}])
 
 
 if __name__ == '__main__':

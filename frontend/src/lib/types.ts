@@ -63,6 +63,7 @@ export interface FollowRequest {
 }
 
 export interface ConnectionsData {
+  interconnections: { source: number; target: number }[]
   connections: User[]
   requests: (FollowRequest & { user: User })[]
 }

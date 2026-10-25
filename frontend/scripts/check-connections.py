@@ -86,16 +86,67 @@ with sync_playwright() as p:
     for uid in ids[2:]:
         request=call(ids[0],'POST',f'/connections/users/{uid}')
         call(uid,'POST',f'/connections/requests/{request["id"]}/respond',{'status':'accepted'})
+    request=call(ids[2],'POST',f'/connections/users/{ids[3]}')
+    call(ids[3],'POST',f'/connections/requests/{request["id"]}/respond',{'status':'accepted'})
     sender.goto('http://127.0.0.1:5173/connections')
     graph=sender.get_by_label('Connections graph with 3 connections.',exact=False)
     graph.wait_for()
     assert graph.locator('a').count()==3
-    assert graph.locator('a[data-role="student"] > circle').count()==2
-    assert graph.locator('a[data-role="mentor"] > path').count()==1
-    assert graph.locator('a[data-role="faculty"] > rect').count()==1
+    assert graph.locator('[data-interconnections] line').count()==1
+    assert graph.locator('a[data-role="student"] circle').count()==2
+    assert graph.locator('a[data-role="mentor"] path').count()==1
+    assert graph.locator('a[data-role="faculty"] rect').count()==1
     for person in ['Ashley Student','Morgan Mentor','Devin Faculty','Taylor Student']:
-        assert person not in graph.text_content()
+        assert person not in ''.join(graph.locator('text').all_text_contents())
+    assert sorted(graph.locator('a title').all_text_contents()) == ['Devin Faculty','Morgan Mentor','Taylor Student']
+    def positions():
+        return graph.locator('a[data-role]').evaluate_all('(nodes)=>nodes.map(n=>[n.getAttribute("href"),n.querySelector("g").getAttribute("transform")]).sort((a,b)=>a[0].localeCompare(b[0]))')
+    initial=positions()
+    center=graph.locator('[data-graph-center]').inner_html()
+    bounds=graph.bounding_box()
+    sender.mouse.move(bounds['x']+bounds['width']/2+45,bounds['y']+bounds['height']/2+20)
+    sender.mouse.down()
+    sender.mouse.move(bounds['x']+bounds['width']/2+120,bounds['y']+bounds['height']/2+65,steps=12)
+    sender.mouse.up()
+    assert positions()!=initial
+    assert graph.locator('[data-graph-center]').inner_html()==center
+    assert sender.url.endswith('/connections')
+    graph.focus()
+    graph.press('Home')
+    assert positions()==initial
+    graph.press('ArrowRight')
+    assert positions()!=initial
+    rotated=positions()
+    sender.mouse.wheel(0,-150)
+    sender.wait_for_timeout(200)
+    assert positions()==rotated
+    assert graph.get_attribute('viewBox')=='-210 -210 420 420'
+    graph.press('Home')
+    sender.evaluate('scrollTo(0,0)')
     sender.screenshot(path=str(out/'desktop.png'),full_page=False)
+    print('3D drag and keyboard rotation, fixed center, reset, and no wheel zoom pass.',flush=True)
+    sender.emulate_media(reduced_motion='no-preference')
+    graph.evaluate('(svg)=>svg.blur()')
+    sender.mouse.move(0,0)
+    before_spin=positions()
+    sender.wait_for_timeout(600)
+    assert positions()!=before_spin
+    bounds=graph.bounding_box()
+    sender.mouse.move(bounds['x']+20,bounds['y']+20)
+    paused=positions()
+    sender.wait_for_timeout(400)
+    assert positions()==paused
+    sender.mouse.move(0,0)
+    graph.focus()
+    paused=positions()
+    sender.wait_for_timeout(400)
+    assert positions()==paused
+    sender.emulate_media(reduced_motion='reduce')
+    graph.evaluate('(svg)=>svg.blur()')
+    paused=positions()
+    sender.wait_for_timeout(400)
+    assert positions()==paused
+    print('Passive spin, hover/focus pause, and reduced-motion behavior pass.',flush=True)
     receiver.goto('http://127.0.0.1:5173/connections')
     receiver.get_by_role('heading',name='Your connections (1)',exact=True).wait_for()
     receiver.screenshot(path=str(out/'mobile.png'),full_page=False)

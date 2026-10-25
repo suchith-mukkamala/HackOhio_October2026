@@ -35,7 +35,10 @@ def connections(user: User = Depends(current_user), session: Session = Depends(g
             people.append(person)
         else:
             visible_requests.append(dict(**request_data(request), user=person))
-    return dict(connections=people, requests=visible_requests)
+    # Only expose accepted edges whose two endpoints are already the viewer's connections.
+    ids = [person.id for person in people]
+    edges = session.exec(select(ConnectionRequest).where(ConnectionRequest.status == 'accepted', ConnectionRequest.low_id.in_(ids), ConnectionRequest.high_id.in_(ids)).order_by(ConnectionRequest.low_id, ConnectionRequest.high_id)).all() if ids else []
+    return dict(connections=people, requests=visible_requests, interconnections=[dict(source=edge.low_id, target=edge.high_id) for edge in edges])
 
 
 @router.get('/users/{user_id}')
