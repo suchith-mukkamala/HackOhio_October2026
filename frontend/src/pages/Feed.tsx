@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CircleCheck, CircleHelp, ImagePlus, Lightbulb, Link2, Send, Trash2, X } from 'lucide-react'
 import './Feed.css'
 import HomeSidebar from '../components/HomeSidebar'
-import { Ladder, OrgsCard } from '../components/Community'
+import { OrgsCard } from '../components/Community'
 import Avatar from '../components/Avatar'
 import { ApiError, api, post } from '../lib/api'
 import { headline, useMe } from '../lib/auth'
@@ -75,7 +75,7 @@ function Composer({ onPosted }: { onPosted: () => void }) {
           id="composer"
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="Share what you built or what you're stuck on…"
+          aria-label="Share project progress" placeholder="What did your team finish? What is blocking the next step?"
           rows={2}
           className="w-full resize-none bg-transparent text-[15px] placeholder:text-muted focus:outline-none"
         />
@@ -301,12 +301,11 @@ export default function Feed() {
         </div>
       )}
       <div id="feed" className="flex min-w-0 flex-col gap-4">
-        {me?.role === 'student' && <Ladder />}
         <Composer onPosted={refresh} />
         {feed.data?.length === 0 && <p className="text-muted">Nothing here yet. Post the first update.</p>}
         {feed.data?.map((item) => <PostCard key={item.post.id} item={item} meId={me?.id} onChange={refresh} />)}
       </div>
-      {me && <div className="home-sidebar-shell min-w-0 md:col-start-2 lg:col-start-3 lg:row-start-1 lg:sticky lg:top-20"><HomeSidebar me={me} /></div>}
+      {me && <div className="home-sidebar-shell min-w-0 md:col-start-2 lg:col-start-3 lg:row-start-1 lg:sticky lg:top-20"><HomeSidebar me={me} opportunitiesOnly /></div>}
     </div>
   )
 }

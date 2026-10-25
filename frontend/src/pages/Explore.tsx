@@ -9,8 +9,8 @@ import type { Project, User } from '../lib/types'
 import type { ExploreCategory, ExploreEntry } from '../lib/exploreData'
 
 const categories = [
-  { id: 'students', label: 'Students', icon: Users },
   { id: 'projects', label: 'Projects', icon: FolderGit2 },
+  { id: 'students', label: 'Teammates', icon: Users },
   { id: 'mentors', label: 'Mentors', icon: GraduationCap },
 ] as const
 
@@ -35,8 +35,9 @@ function ResultCard({ entry, fuzzy, onSkill }: { entry: ExploreEntry; fuzzy: boo
 }
 
 export default function Explore() {
-  const [category, setCategory] = useState<ExploreCategory>('students')
   const [params, setParams] = useSearchParams()
+  const requestedCategory = params.get('category')
+  const category: ExploreCategory = requestedCategory === 'students' || requestedCategory === 'mentors' ? requestedCategory : 'projects'
   const query = params.get('q') ?? ''
   function setQuery(value: string) {
     setParams(previous => {
@@ -73,11 +74,14 @@ export default function Explore() {
   const hasFilters = Boolean(role || skill || major || query)
 
   function clearFilters() { setRole(''); setSkill(''); setMajor('') }
-  function switchCategory(next: ExploreCategory) { setCategory(next); clearFilters() }
+  function switchCategory(next: ExploreCategory) {
+    setParams(previous => { const updated = new URLSearchParams(previous); updated.set('category', next); return updated })
+    clearFilters()
+  }
   function reset() { clearFilters(); setQuery('') }
 
   return <div className="mx-auto max-w-6xl">
-    <header className="mb-6 flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-semibold">Explore</h1><p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">Find your next teammate, a project to build, or a mentor to learn from.</p></div><span className="inline-flex items-center gap-2 rounded-full border border-edge bg-card px-3 py-1.5 text-xs text-muted">Live directory</span></header>
+    <header className="mb-6 flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-semibold">Explore</h1><p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">Join a project you can help finish. Find teammates and mentors to get it over the line.</p></div><span className="inline-flex items-center gap-2 rounded-full border border-edge bg-card px-3 py-1.5 text-xs text-muted">Live directory</span></header>
     <div className="mb-6 grid gap-3 sm:grid-cols-3" role="group" aria-label="Search category">{categories.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => switchCategory(id)} aria-pressed={category === id} className={`flex items-center gap-3 rounded-2xl border p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${category === id ? 'border-accent/60 bg-accent-soft' : 'border-edge bg-card hover:bg-tile'}`}><span className={`grid h-10 w-10 place-items-center rounded-xl ${category === id ? 'bg-accent/15 text-accent' : 'bg-tile text-muted'}`}><Icon size={21} /></span><span className="flex-1 font-semibold">{label}</span><span className={`text-sm ${category === id ? 'text-accent' : 'text-muted'}`}>{exploreEntries.filter(entry => entry.category === id).length}</span></button>)}</div>
     {category === 'projects' && <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-edge bg-card px-4 py-3"><p className="text-sm text-muted">See what teams have finished building.</p><Link to="/showcase" className="text-sm font-medium text-accent hover:underline">View completed project showcase</Link></div>}
     <section aria-label="Search and filters" className="rounded-2xl border border-edge bg-card p-5">

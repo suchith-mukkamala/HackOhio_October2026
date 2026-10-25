@@ -39,7 +39,8 @@ export default function Landing({ register = false }: { register?: boolean }) {
           <h1 className="text-5xl leading-[1.05] font-semibold tracking-tight">
             {register ? 'Join Keystone' : 'Welcome to Keystone'}
           </h1>
-          <p className="mt-4 text-lg text-slate">A portfolio AI can't fake.</p>
+          <p className="mt-4 text-lg font-medium text-slate">Find your team. Finish something real.</p>
+          <p className="mt-3 text-sm leading-relaxed text-slate">Build a project with other students, get help when you are stuck, and showcase what you finish.</p>
 
           <form key={String(register)} onSubmit={signIn} className="mt-8 flex flex-col gap-4">
             {register && (

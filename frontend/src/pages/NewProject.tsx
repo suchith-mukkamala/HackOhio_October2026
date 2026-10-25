@@ -47,8 +47,8 @@ export default function NewProject({ project, onDone }: { project?: Project; onD
   return (
     <form onSubmit={submit} className="mx-auto flex max-w-xl flex-col gap-5 rounded-2xl border border-edge bg-card p-6">
       <div>
-        <h1 className="text-2xl font-semibold">{project ? 'Edit project' : 'Push a project'}</h1>
-        <p className="mt-1 text-sm text-muted">4–6 weeks, real work, with mentors one click away.</p>
+        <h1 className="text-2xl font-semibold">{project ? 'Edit project' : 'Start a project you can finish'}</h1>
+        <p className="mt-1 text-sm text-muted">Choose one deliverable, a target finish date, and the teammates who can help.</p>
       </div>
 
       <label>
@@ -57,7 +57,8 @@ export default function NewProject({ project, onDone }: { project?: Project; onD
       </label>
       <label>
         <span className={label}>description</span>
-        <textarea id="description" name="description" defaultValue={project?.description} rows={3} placeholder="What are you building, and for whom?" className={field} />
+        <textarea id="description" name="description" defaultValue={project?.description} rows={4} placeholder="Who is this for? What will you deliver? What must work for your team to call it finished?" aria-describedby="project-scope-help" className={field} />
+        <span id="project-scope-help" className="mt-2 block text-xs leading-relaxed text-muted">Define a small, concrete result: a working demo, a tested prototype, or a published release. Save extra ideas for a later version.</span>
       </label>
       <label>
         <span className={label}>github repo</span>
@@ -80,7 +81,7 @@ export default function NewProject({ project, onDone }: { project?: Project; onD
           <input id="start_date" name="start_date" defaultValue={project?.start_date ?? ''} type="date" className={`${field} [color-scheme:dark]`} />
         </label>
         <label>
-          <span className={label}>ends</span>
+          <span className={label}>target finish date</span>
           <input id="end_date" name="end_date" defaultValue={project?.end_date ?? ''} type="date" className={`${field} [color-scheme:dark]`} />
         </label>
       </div>
